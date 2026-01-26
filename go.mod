@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/creack/pty v1.1.11
+	github.com/creack/pty v1.1.24
 	github.com/fatih/structs v1.1.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/pkg/errors v0.9.1
@@ -18,5 +18,4 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
-	golang.org/x/sys v0.1.0 // indirect
 )
