@@ -55,6 +55,7 @@ assets: bindata/static/js/gotty.js.map \
 	bindata/static/css/index.css \
 	bindata/static/css/xterm.css \
 	bindata/static/css/xterm_customize.css \
+	bindata/static/css/filemanager.css \
 	bindata/static/manifest.json \
 	bindata/static/icon_192.png
 

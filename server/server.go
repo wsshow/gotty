@@ -217,6 +217,12 @@ func (server *Server) setupHandlers(ctx context.Context, cancel context.CancelFu
 	siteMux.HandleFunc(pathPrefix+"auth_token.js", server.handleAuthToken)
 	siteMux.HandleFunc(pathPrefix+"config.js", server.handleConfig)
 
+	// File management endpoints
+	siteMux.HandleFunc(pathPrefix+"api/upload", server.handleFileUpload)
+	siteMux.HandleFunc(pathPrefix+"api/download", server.handleFileDownload)
+	siteMux.HandleFunc(pathPrefix+"api/files", server.handleFileList)
+	siteMux.HandleFunc(pathPrefix+"api/delete", server.handleFileDelete)
+
 	siteHandler := http.Handler(siteMux)
 
 	if server.options.EnableBasicAuth {

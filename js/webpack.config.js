@@ -22,7 +22,10 @@ module.exports = {
         extensions: [".ts", ".tsx", ".js"],
     },
     plugins: [
-        new LicenseWebpackPlugin()
+        new LicenseWebpackPlugin({
+            unacceptableLicenseTest: (licenseType) => false,
+            excludedPackageTest: (packageName) => packageName === 'jsx-runtime' || packageName === 'preact-hooks'
+        })
     ],
     module: {
         rules: [
@@ -41,7 +44,9 @@ module.exports = {
                     loader: "sass-loader",
                     options: {
                         sassOptions: {
-                            includePaths: ["node_modules/bootstrap/scss"]
+                            includePaths: ["node_modules/bootstrap/scss"],
+                            quietDeps: true,
+                            silenceDeprecations: ['import', 'global-builtin', 'color-functions']
                         }
                     }
                 }
@@ -57,4 +62,9 @@ module.exports = {
             }
         })],
     },
+    performance: {
+        hints: false,
+        maxAssetSize: 2000000,
+        maxEntrypointSize: 2000000
+    }
 };

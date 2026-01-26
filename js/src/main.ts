@@ -1,6 +1,8 @@
 import { ConnectionFactory } from "./websocket";
 import { Terminal, WebTTY, protocols } from "./webtty";
 import { GoTTYXterm } from "./xterm";
+import { FileManager } from "./FileManager";
+import { h, render } from "preact";
 
 // @TODO remove these
 declare var gotty_auth_token: string;
@@ -29,3 +31,38 @@ if (elem !== null) {
         term.close();
     });
 };
+
+// File Manager Integration
+const fileManagerBtn = document.getElementById("file-manager-btn");
+if (fileManagerBtn) {
+    let fileManagerContainer: HTMLDivElement | null = null;
+
+    fileManagerBtn.addEventListener("click", () => {
+        if (fileManagerContainer) {
+            // Already open, close it
+            if (fileManagerContainer.parentNode) {
+                render(null, fileManagerContainer);
+                document.body.removeChild(fileManagerContainer);
+            }
+            fileManagerContainer = null;
+        } else {
+            // Open file manager
+            fileManagerContainer = document.createElement("div");
+            fileManagerContainer.id = "file-manager-container";
+            document.body.appendChild(fileManagerContainer);
+
+            const closeFileManager = () => {
+                if (fileManagerContainer && fileManagerContainer.parentNode) {
+                    render(null, fileManagerContainer);
+                    document.body.removeChild(fileManagerContainer);
+                }
+                fileManagerContainer = null;
+            };
+
+            render(
+                h(FileManager, { onClose: closeFileManager }),
+                fileManagerContainer
+            );
+        }
+    });
+}

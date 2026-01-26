@@ -1,6 +1,6 @@
 import { createRef, Component, ComponentChildren } from "preact";
 import { Modal } from "bootstrap";
-import './bootstrap.scss';
+import 'bootstrap/scss/bootstrap.scss';
 
 interface ModalProps {
   children: ComponentChildren;
@@ -56,8 +56,8 @@ interface ButtonProps {
   disabled?: boolean;
 }
 
-export function Button(props:ButtonProps) {
+export function Button(props: ButtonProps) {
   let classes: string = "btn btn-" + props.priority
 
-  return <button type="button" disabled={props.disabled} class={classes} onClick={ () => { props.clickHandler ? props.clickHandler() : null; }}>{ props.children}</button>
+  return <button type="button" disabled={props.disabled} class={classes} onClick={() => { props.clickHandler ? props.clickHandler() : null; }}>{props.children}</button>
 }
