@@ -129,9 +129,9 @@ func (server *Server) processWSConn(ctx context.Context, conn *websocket.Conn, h
 
 	titleVars := server.titleVariables(
 		[]string{"server", "master", "slave"},
-		map[string]map[string]interface{}{
+		map[string]map[string]any{
 			"server": server.options.TitleVariables,
-			"master": map[string]interface{}{
+			"master": {
 				"remote_addr": conn.RemoteAddr(),
 			},
 			"slave": slave.WindowTitleVariables(),
@@ -206,9 +206,9 @@ func (server *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 func (server *Server) indexVariables(r *http.Request) (map[string]interface{}, error) {
 	titleVars := server.titleVariables(
 		[]string{"server", "master"},
-		map[string]map[string]interface{}{
+		map[string]map[string]any{
 			"server": server.options.TitleVariables,
-			"master": map[string]interface{}{
+			"master": {
 				"remote_addr": r.RemoteAddr,
 			},
 		},
