@@ -17,6 +17,36 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: js/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: js
+
+      - name: Build frontend assets
+        run: npx webpack --mode=production
+        working-directory: js
+
+      - name: Prepare bindata static files
+        run: |
+          mkdir -p bindata/static/css bindata/static/js
+          cp resources/index.html bindata/static/
+          cp resources/icon.svg bindata/static/ 2>/dev/null || true
+          cp resources/favicon.ico bindata/static/ 2>/dev/null || true
+          cp resources/manifest.json bindata/static/
+          cp resources/icon_192.png bindata/static/ 2>/dev/null || true
+          cp resources/index.css bindata/static/css/
+          cp resources/xterm_customize.css bindata/static/css/
+          cp resources/filemanager.css bindata/static/css/
+          cp js/node_modules/@xterm/xterm/css/xterm.css bindata/static/css/
+          cp js/dist/gotty.js bindata/static/js/
+          cp js/dist/gotty.js.map bindata/static/js/
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
