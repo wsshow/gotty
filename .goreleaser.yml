@@ -1,0 +1,49 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: "gotty" # 内部标识符
+    binary: "gotty" # 决定了生成的文件名是 gotty (Windows 下自动加 .exe)
+    env:
+      - CGO_ENABLED=0
+    main: .
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X 'gotty/version.version={{.Version}}'
+      - -X 'gotty/version.buildTime={{.Date}}'
+    flags:
+      - -trimpath
+
+archives:
+  - formats: ["zip"]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+release:
+  github:
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
