@@ -11,6 +11,10 @@ LDFlags = -ldflags "-s -w -X '${Name}/version.version=$(Version)' -X '${Name}/ve
 # 默认全量编译的目标列表
 targets ?= darwin:arm64 windows:amd64 linux:amd64
 
+# release 输出目录
+BUILDS_PKG_DIR = builds/pkg
+BUILDS_DIST_DIR = builds/dist
+
 # 前端编译模式
 ifeq ($(DEV), 1)
 	WEBPACK_MODE = development
@@ -44,6 +48,44 @@ build:
 		env CGO_ENABLED=0 GOOS=$${os} GOARCH=$${arch} go build -trimpath $(LDFlags) -o $${output_name} ./main.go;\
 		echo "编译完成: $${output_name}";\
 	)
+
+# release-artifacts: 为 GitHub Actions 准备发布产物
+.PHONY: release-artifacts
+release-artifacts: assets
+	@echo "开始构建发布产物..."
+	@rm -rf $(BUILDS_PKG_DIR) $(BUILDS_DIST_DIR)
+	@mkdir -p $(BUILDS_PKG_DIR) $(BUILDS_DIST_DIR)
+	@$(foreach n, $(targets),\
+		os=$$(echo "$(n)" | cut -d : -f 1);\
+		arch=$$(echo "$(n)" | cut -d : -f 2);\
+		suffix=""; \
+		if [ "$${os}" = "windows" ]; then suffix=".exe"; fi; \
+		pkg_dir="$(BUILDS_PKG_DIR)/${Name}_$${os}_$${arch}"; \
+		binary_name="${Name}$${suffix}"; \
+		output_name="$${pkg_dir}/$${binary_name}"; \
+		dist_name="$(BUILDS_DIST_DIR)/${Name}_$${os}_$${arch}.tar.gz"; \
+		echo "正在编译: $${os}/$${arch}..."; \
+		mkdir -p "$${pkg_dir}"; \
+		env CGO_ENABLED=0 GOOS=$${os} GOARCH=$${arch} go build -trimpath $(LDFlags) -o "$${output_name}" ./main.go; \
+		echo "打包: $${dist_name}"; \
+		tar -czf "$${dist_name}" -C "$${pkg_dir}" "$${binary_name}"; \
+		echo "完成: $${dist_name}";\
+	)
+	@echo "所有发布产物已准备完成"
+
+# test: 运行测试
+.PHONY: test
+test:
+	@echo "运行测试..."
+	go test -v ./...
+
+# tools: 安装必要的工具
+.PHONY: tools
+tools:
+	@echo "检查工具依赖..."
+	@which go > /dev/null || (echo "错误: 未找到 go" && exit 1)
+	@which npm > /dev/null || (echo "错误: 未找到 npm" && exit 1)
+	@echo "所有工具依赖已就绪"
 
 # 前端资源打包
 .PHONY: assets
@@ -81,6 +123,6 @@ js/node_modules/webpack:
 	cd js && npm install
 
 clean:
-	rm -rf ./release bindata/static js/dist js/node_modules
+	rm -rf ./release bindata/static js/dist js/node_modules $(BUILDS_PKG_DIR) $(BUILDS_DIST_DIR)
 
-.PHONY: native all build clean assets
+.PHONY: native all build clean assets test tools release-artifacts
