@@ -910,6 +910,36 @@ input[type="checkbox"] {
     padding: 20px;
 }
 
+/* Preview loading */
+.preview-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #2a2a2a;
+    border-top-color: #5dade2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-text {
+    color: #cccccc;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
 .preview-container {
     background: #1a1a1a;
     border: 1px solid #444;

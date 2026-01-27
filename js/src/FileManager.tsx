@@ -45,6 +45,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
     const [batchUploadStats, setBatchUploadStats] = useState<BatchUploadStats | null>(null);
     const [loading, setLoading] = useState(false);
+    const [previewLoading, setPreviewLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentPath, setCurrentPath] = useState<string>('.');
     const [pathHistory, setPathHistory] = useState<string[]>(['.']);
@@ -494,6 +495,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         }
 
         setError(null);
+        setPreviewLoading(true);
         const filePath = getFilePath(file.name);
 
         try {
@@ -538,6 +540,8 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Preview failed');
+        } finally {
+            setPreviewLoading(false);
         }
     };
 
@@ -691,6 +695,20 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     };
 
     const renderPreview = () => {
+        if (!previewFile && !previewLoading) return null;
+
+        // Show loading overlay
+        if (previewLoading) {
+            return (
+                <div className="preview-overlay">
+                    <div className="preview-loading">
+                        <div className="loading-spinner"></div>
+                        <div className="loading-text">加载预览中...</div>
+                    </div>
+                </div>
+            );
+        }
+
         if (!previewFile) return null;
 
         // Get language from file extension for syntax highlighting
