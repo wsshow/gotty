@@ -149,13 +149,16 @@ func (server *Server) processWSConn(ctx context.Context, conn *websocket.Conn, h
 		return errors.Wrapf(err, "failed to authenticate websocket connection")
 	}
 
-	// Decode base64 auth token and compare with credential
-	decodedAuth, err := base64.StdEncoding.DecodeString(init.AuthToken)
-	if err != nil || string(decodedAuth) != server.options.Credential {
-		log.Printf("[GoTTY] WebSocket init auth failed: decoded='%s', expected='%s', decode_err=%v", string(decodedAuth), server.options.Credential, err)
-		return errors.New("failed to authenticate websocket connection")
+	// Only verify auth token if basic auth is enabled
+	if server.options.EnableBasicAuth && server.options.Credential != "" {
+		// Decode base64 auth token and compare with credential
+		decodedAuth, err := base64.StdEncoding.DecodeString(init.AuthToken)
+		if err != nil || string(decodedAuth) != server.options.Credential {
+			log.Printf("[GoTTY] WebSocket init auth failed: decoded='%s', expected='%s', decode_err=%v", string(decodedAuth), server.options.Credential, err)
+			return errors.New("failed to authenticate websocket connection")
+		}
+		log.Printf("[GoTTY] WebSocket initialization authenticated successfully")
 	}
-	log.Printf("[GoTTY] WebSocket initialization authenticated successfully")
 
 	queryPath := "?"
 	if server.options.PermitArguments && init.Arguments != "" {
