@@ -851,6 +851,84 @@
     border-color: #3d6a9f;
 }
 
+/* Batch Download Progress */
+.batch-download-progress {
+    margin-bottom: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #252525 0%, #1e1e1e 100%);
+    border-radius: 10px;
+    border: 1px solid #3a3a3a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.download-preparing {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: center;
+    padding: 20px;
+}
+
+.preparing-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #2a2a2a;
+    border-top-color: #5dade2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.preparing-text {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.download-stats {
+    display: flex;
+    flex-direction: column;
+}
+
+.download-complete {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: center;
+    padding: 20px;
+}
+
+.complete-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #1e4a2f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: scaleIn 0.3s ease-out;
+}
+
+.complete-icon svg {
+    width: 30px;
+    height: 30px;
+    fill: #7ee787;
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0);
+    }
+    to {
+        transform: scale(1);
+    }
+}
+
+.complete-text {
+    color: #7ee787;
+    font-size: 16px;
+    font-weight: 600;
+}
+
 /* Batch delete button */
 .batch-delete-btn {
     padding: 8px 16px;

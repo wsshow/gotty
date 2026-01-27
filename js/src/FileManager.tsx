@@ -39,21 +39,53 @@ const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
 const LARGE_FILE_SIZE = 10 * 1024 * 1024; // Files larger than 10MB use chunked upload
 
 export const FileManager = ({ onClose }: FileManagerProps) => {
+    // Load initial state from sessionStorage
+    const loadSavedState = () => {
+        try {
+            const saved = sessionStorage.getItem('fileManagerState');
+            if (saved) {
+                const state = JSON.parse(saved);
+                return {
+                    currentPath: state.currentPath || '.',
+                    pathHistory: state.pathHistory || ['.'],
+                    selectedFiles: new Set<string>(state.selectedFiles || [])
+                };
+            }
+        } catch (err) {
+            console.error('Failed to load saved state:', err);
+        }
+        return {
+            currentPath: '.',
+            pathHistory: ['.'],
+            selectedFiles: new Set<string>()
+        };
+    };
+
+    const initialState = loadSavedState();
+
     const [files, setFiles] = useState<FileInfo[]>([]);
-    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(initialState.selectedFiles);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
     const [batchUploadStats, setBatchUploadStats] = useState<BatchUploadStats | null>(null);
     const [loading, setLoading] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [currentPath, setCurrentPath] = useState<string>('.');
-    const [pathHistory, setPathHistory] = useState<string[]>(['.']);
+    const [currentPath, setCurrentPath] = useState<string>(initialState.currentPath);
+    const [pathHistory, setPathHistory] = useState<string[]>(initialState.pathHistory);
     const [confirmDelete, setConfirmDelete] = useState<{ file: FileInfo; show: boolean } | null>(null);
     const [confirmBatchDelete, setConfirmBatchDelete] = useState<{ files: string[]; show: boolean } | null>(null);
     const [confirmDownload, setConfirmDownload] = useState<{ file: FileInfo; show: boolean } | null>(null);
     const [previewFile, setPreviewFile] = useState<{ file: FileInfo; content: string | null; type: string } | null>(null);
     const [downloadProgress, setDownloadProgress] = useState<{ filename: string; progress: number } | null>(null);
+    const [batchDownloadProgress, setBatchDownloadProgress] = useState<{ 
+        status: 'preparing' | 'downloading' | 'complete';
+        fileCount: number;
+        downloaded: number;
+        totalBytes: number;
+        speed: number;
+        remainingTime: number;
+    } | null>(null);
     const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
     
@@ -98,6 +130,20 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         loadFiles(currentPath);
     }, [currentPath]);
 
+    // Save state to sessionStorage whenever it changes
+    useEffect(() => {
+        try {
+            const stateToSave = {
+                currentPath,
+                pathHistory,
+                selectedFiles: Array.from(selectedFiles)
+            };
+            sessionStorage.setItem('fileManagerState', JSON.stringify(stateToSave));
+        } catch (err) {
+            console.error('Failed to save state:', err);
+        }
+    }, [currentPath, pathHistory, selectedFiles]);
+
     const loadFiles = async (path: string = '.') => {
         setLoading(true);
         setError(null);
@@ -109,8 +155,18 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 throw new Error('Failed to load files');
             }
             const data = await response.json();
-            setFiles(data.files || []);
+            const loadedFiles = data.files || [];
+            setFiles(loadedFiles);
             setCurrentPath(data.currentPath || '.');
+
+            // Clean up invalid selections (files that no longer exist)
+            if (selectedFiles.size > 0) {
+                const validFileNames = new Set(loadedFiles.map((f: FileInfo) => f.name));
+                const validSelections = Array.from(selectedFiles).filter(name => validFileNames.has(name));
+                if (validSelections.length !== selectedFiles.size) {
+                    setSelectedFiles(new Set(validSelections));
+                }
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load files');
         } finally {
@@ -441,31 +497,94 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         setError(null);
         const filePaths = Array.from(selectedFiles).map(name => getFilePath(name));
 
+        // Show preparing status
+        setBatchDownloadProgress({
+            status: 'preparing',
+            fileCount: filePaths.length,
+            downloaded: 0,
+            totalBytes: 0,
+            speed: 0,
+            remainingTime: 0
+        });
+
         try {
-            const response = await fetch('api/batch-download', {
-                method: 'POST',
-                headers: {
-                    ...getAuthHeaders(),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ files: filePaths }),
+            const startTime = Date.now();
+            
+            // Use XMLHttpRequest for progress tracking
+            await new Promise<void>((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.open('POST', 'api/batch-download');
+                
+                // Add auth headers
+                const auth = sessionStorage.getItem('gotty_auth');
+                if (auth) {
+                    xhr.setRequestHeader('Authorization', `Basic ${auth}`);
+                }
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                
+                xhr.responseType = 'blob';
+                
+                // Track download progress
+                xhr.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const elapsed = (Date.now() - startTime) / 1000;
+                        const speed = elapsed > 0 ? e.loaded / elapsed : 0;
+                        const remaining = speed > 0 ? (e.total - e.loaded) / speed : 0;
+
+                        setBatchDownloadProgress({
+                            status: 'downloading',
+                            fileCount: filePaths.length,
+                            downloaded: e.loaded,
+                            totalBytes: e.total,
+                            speed,
+                            remainingTime: remaining
+                        });
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        const blob = xhr.response;
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'files.zip';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        // Show complete status briefly
+                        setBatchDownloadProgress({
+                            status: 'complete',
+                            fileCount: filePaths.length,
+                            downloaded: 0,
+                            totalBytes: 0,
+                            speed: 0,
+                            remainingTime: 0
+                        });
+                        
+                        setTimeout(() => {
+                            setBatchDownloadProgress(null);
+                        }, 2000);
+                        
+                        resolve();
+                    } else {
+                        reject(new Error('Batch download failed'));
+                    }
+                });
+                
+                xhr.addEventListener('error', () => {
+                    reject(new Error('Batch download failed'));
+                });
+                
+                xhr.send(JSON.stringify({ files: filePaths }));
             });
 
-            if (!response.ok) {
-                throw new Error('Batch download failed');
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'files.zip';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Batch download failed');
+            setBatchDownloadProgress(null);
         }
     };
 
@@ -1061,6 +1180,67 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                     />
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {batchDownloadProgress && (
+                        <div className="batch-download-progress">
+                            {batchDownloadProgress.status === 'preparing' && (
+                                <div className="download-preparing">
+                                    <div className="preparing-spinner"></div>
+                                    <div className="preparing-text">
+                                        正在打包 {batchDownloadProgress.fileCount} 个文件...
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {batchDownloadProgress.status === 'downloading' && (
+                                <div className="download-stats">
+                                    <div className="stats-header">
+                                        <span className="stats-title">下载进度</span>
+                                        <span className="stats-files">
+                                            {batchDownloadProgress.fileCount} 个文件
+                                        </span>
+                                    </div>
+                                    <div className="stats-progress-bar">
+                                        <div 
+                                            className="stats-progress-fill" 
+                                            style={{ 
+                                                width: `${(batchDownloadProgress.downloaded / batchDownloadProgress.totalBytes) * 100}%` 
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="stats-details">
+                                        <div className="stats-row">
+                                            <span className="stats-label">已下载:</span>
+                                            <span className="stats-value">
+                                                {formatBytes(batchDownloadProgress.downloaded)} / {formatBytes(batchDownloadProgress.totalBytes)}
+                                            </span>
+                                        </div>
+                                        <div className="stats-row">
+                                            <span className="stats-label">速度:</span>
+                                            <span className="stats-value">{formatSpeed(batchDownloadProgress.speed)}</span>
+                                        </div>
+                                        <div className="stats-row">
+                                            <span className="stats-label">剩余时间:</span>
+                                            <span className="stats-value">{formatTime(batchDownloadProgress.remainingTime)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {batchDownloadProgress.status === 'complete' && (
+                                <div className="download-complete">
+                                    <div className="complete-icon">
+                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                        </svg>
+                                    </div>
+                                    <div className="complete-text">
+                                        下载完成！{batchDownloadProgress.fileCount} 个文件已打包
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
