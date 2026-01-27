@@ -712,6 +712,119 @@
     background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 50%, rgba(0,0,0,0.2) 100%);
 }
 
+/* Batch Upload Stats */
+.batch-upload-stats {
+    margin-bottom: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #252525 0%, #1e1e1e 100%);
+    border-radius: 10px;
+    border: 1px solid #3a3a3a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #333;
+}
+
+.stats-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #5dade2;
+    letter-spacing: 0.5px;
+}
+
+.stats-files {
+    font-size: 14px;
+    color: #cccccc;
+    font-weight: 500;
+}
+
+.stats-progress-bar {
+    height: 12px;
+    background: #0a0a0a;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.stats-progress-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
+    animation: shimmer 2s infinite;
+}
+
+.stats-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a9fd8 0%, #5dade2 50%, #6fbde8 100%);
+    transition: width 0.3s ease;
+    position: relative;
+    box-shadow: 0 0 12px rgba(93, 173, 226, 0.4);
+}
+
+.stats-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 50%, rgba(0,0,0,0.2) 100%);
+}
+
+.stats-details {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #1a1a1a;
+    border-radius: 6px;
+    border: 1px solid #2a2a2a;
+}
+
+.stats-row.stats-current-file {
+    border-left: 3px solid #5dade2;
+}
+
+.stats-label {
+    font-size: 13px;
+    color: #999999;
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.stats-value {
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: right;
+}
+
+.stats-filename-ellipsis {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #5dade2;
+}
+
 /* Batch download button */
 .batch-download-btn {
     padding: 8px 16px;

@@ -24,6 +24,17 @@ interface UploadProgress {
     };
 }
 
+interface BatchUploadStats {
+    totalFiles: number;
+    completedFiles: number;
+    totalBytes: number;
+    uploadedBytes: number;
+    startTime: number;
+    currentFile: string;
+    speed: number; // bytes per second
+    remainingTime: number; // seconds
+}
+
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
 const LARGE_FILE_SIZE = 10 * 1024 * 1024; // Files larger than 10MB use chunked upload
 
@@ -32,6 +43,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
+    const [batchUploadStats, setBatchUploadStats] = useState<BatchUploadStats | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentPath, setCurrentPath] = useState<string>('.');
@@ -56,6 +68,29 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             };
         }
         return {};
+    };
+
+    const formatBytes = (bytes: number): string => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const formatSpeed = (bytesPerSecond: number): string => {
+        return formatBytes(bytesPerSecond) + '/s';
+    };
+
+    const formatTime = (seconds: number): string => {
+        if (!isFinite(seconds) || seconds < 0) return '--:--';
+        if (seconds < 60) return `${Math.round(seconds)}秒`;
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.round(seconds % 60);
+        if (minutes < 60) return `${minutes}分${secs}秒`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}小时${mins}分`;
     };
 
     useEffect(() => {
@@ -165,10 +200,12 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             // Group files by size
             const largeFiles: { file: File; path: string }[] = [];
             const normalFiles: { file: File; path: string }[] = [];
+            let totalBytes = 0;
 
             for (let i = 0; i < fileList.length; i++) {
                 const file = fileList[i];
                 const relativePath = (file as any).webkitRelativePath || file.name;
+                totalBytes += file.size;
                 
                 console.log(`Processing file: ${file.name}, webkitRelativePath: ${(file as any).webkitRelativePath}, using: ${relativePath}`);
                 
@@ -178,6 +215,22 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                     normalFiles.push({ file, path: relativePath });
                 }
             }
+
+            // Initialize batch upload stats
+            const startTime = Date.now();
+            setBatchUploadStats({
+                totalFiles: fileList.length,
+                completedFiles: 0,
+                totalBytes,
+                uploadedBytes: 0,
+                startTime,
+                currentFile: '',
+                speed: 0,
+                remainingTime: 0
+            });
+
+            let completedFiles = 0;
+            let uploadedBytes = 0;
 
             // Upload normal files in batch (with progress for each)
             if (normalFiles.length > 0) {
@@ -200,6 +253,12 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 // Send paths as a JSON string
                 formData.append('filePaths', JSON.stringify(filePaths));
                 
+                // Update stats with current batch info
+                setBatchUploadStats(prev => prev ? {
+                    ...prev,
+                    currentFile: `批量上传 ${normalFiles.length} 个文件...`
+                } : null);
+
                 setUploadProgress(prev => ({
                     ...prev,
                     [uploadId]: { progress: 0, total: totalSize, filename: `批量上传 (${normalFiles.length} 个文件)` }
@@ -208,9 +267,21 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 // Use XMLHttpRequest to track upload progress
                 await new Promise((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
+                    const batchStartTime = Date.now();
                     
                     xhr.upload.addEventListener('progress', (e) => {
                         if (e.lengthComputable) {
+                            const elapsed = (Date.now() - batchStartTime) / 1000;
+                            const speed = elapsed > 0 ? e.loaded / elapsed : 0;
+                            const remaining = speed > 0 ? (e.total - e.loaded) / speed : 0;
+
+                            setBatchUploadStats(prev => prev ? {
+                                ...prev,
+                                uploadedBytes: uploadedBytes + e.loaded,
+                                speed,
+                                remainingTime: remaining
+                            } : null);
+
                             setUploadProgress(prev => ({
                                 ...prev,
                                 [uploadId]: { progress: e.loaded, total: e.total, filename: `批量上传 (${normalFiles.length} 个文件)` }
@@ -239,6 +310,9 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                     xhr.send(formData);
                 });
                 
+                completedFiles += normalFiles.length;
+                uploadedBytes += totalSize;
+
                 setUploadProgress(prev => {
                     const newProgress = { ...prev };
                     delete newProgress[uploadId];
@@ -247,8 +321,33 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             }
 
             // Upload large files with chunking (with individual progress)
-            for (const { file, path } of largeFiles) {
+            for (let i = 0; i < largeFiles.length; i++) {
+                const { file, path } = largeFiles[i];
+                
+                setBatchUploadStats(prev => prev ? {
+                    ...prev,
+                    completedFiles,
+                    uploadedBytes,
+                    currentFile: path
+                } : null);
+
                 await uploadChunkedFile(file, path);
+                
+                completedFiles++;
+                uploadedBytes += file.size;
+
+                // Update stats after each file
+                const elapsed = (Date.now() - startTime) / 1000;
+                const speed = elapsed > 0 ? uploadedBytes / elapsed : 0;
+                const remaining = speed > 0 ? (totalBytes - uploadedBytes) / speed : 0;
+
+                setBatchUploadStats(prev => prev ? {
+                    ...prev,
+                    completedFiles,
+                    uploadedBytes,
+                    speed,
+                    remainingTime: remaining
+                } : null);
             }
 
             await loadFiles(currentPath);
@@ -256,6 +355,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             setError(err instanceof Error ? err.message : 'Upload failed');
         } finally {
             setUploading(false);
+            setBatchUploadStats(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
             if (folderInputRef.current) folderInputRef.current.value = '';
         }
@@ -864,6 +964,49 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             {loading ? '加载中...' : '刷新'}
                         </button>
                     </div>
+
+                    {batchUploadStats && (
+                        <div className="batch-upload-stats">
+                            <div className="stats-header">
+                                <span className="stats-title">上传进度</span>
+                                <span className="stats-files">
+                                    {batchUploadStats.completedFiles} / {batchUploadStats.totalFiles} 个文件
+                                </span>
+                            </div>
+                            <div className="stats-progress-bar">
+                                <div 
+                                    className="stats-progress-fill" 
+                                    style={{ 
+                                        width: `${(batchUploadStats.uploadedBytes / batchUploadStats.totalBytes) * 100}%` 
+                                    }}
+                                />
+                            </div>
+                            <div className="stats-details">
+                                <div className="stats-row">
+                                    <span className="stats-label">已上传:</span>
+                                    <span className="stats-value">
+                                        {formatBytes(batchUploadStats.uploadedBytes)} / {formatBytes(batchUploadStats.totalBytes)}
+                                    </span>
+                                </div>
+                                <div className="stats-row">
+                                    <span className="stats-label">速度:</span>
+                                    <span className="stats-value">{formatSpeed(batchUploadStats.speed)}</span>
+                                </div>
+                                <div className="stats-row">
+                                    <span className="stats-label">剩余时间:</span>
+                                    <span className="stats-value">{formatTime(batchUploadStats.remainingTime)}</span>
+                                </div>
+                                {batchUploadStats.currentFile && (
+                                    <div className="stats-row stats-current-file">
+                                        <span className="stats-label">当前文件:</span>
+                                        <span className="stats-value stats-filename-ellipsis">
+                                            {batchUploadStats.currentFile}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {Object.keys(uploadProgress).length > 0 && (
                         <div className="upload-progress">
