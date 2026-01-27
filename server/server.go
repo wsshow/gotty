@@ -222,7 +222,9 @@ func (server *Server) setupHandlers(ctx context.Context, cancel context.CancelFu
 
 	// File management endpoints
 	siteMux.HandleFunc(pathPrefix+"api/upload", server.handleFileUpload)
+	siteMux.HandleFunc(pathPrefix+"api/upload-chunk", server.handleChunkUpload)
 	siteMux.HandleFunc(pathPrefix+"api/download", server.handleFileDownload)
+	siteMux.HandleFunc(pathPrefix+"api/batch-download", server.handleBatchDownload)
 	siteMux.HandleFunc(pathPrefix+"api/files", server.handleFileList)
 	siteMux.HandleFunc(pathPrefix+"api/delete", server.handleFileDelete)
 

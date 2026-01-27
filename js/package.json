@@ -4,8 +4,8 @@
     "private": true,
     "devDependencies": {
         "@types/bootstrap": "^5.2.10",
-        "css-loader": "^7.1.2",
         "compression-webpack-plugin": "^11.1.0",
+        "css-loader": "^7.1.2",
         "license-loader": "^0.7.0",
         "license-webpack-plugin": "^4.0.2",
         "purgecss": "^7.0.2",
@@ -27,8 +27,13 @@
         "@xterm/xterm": "^5.5.0",
         "bootstrap": "^5.3.7",
         "debounce": "^2.2.0",
+        "highlight.js": "^11.11.1",
+        "mammoth": "^1.11.0",
+        "marked": "^11.2.0",
+        "papaparse": "^5.5.3",
         "preact": "^10.27.0",
         "react-bootstrap": "^2.10.10",
+        "xlsx": "^0.18.5",
         "zmodem.js": "^0.1.10"
     }
 }

@@ -1,4 +1,9 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
+import { marked } from 'marked';
+import hljs from 'highlight.js';
+import * as XLSX from 'xlsx';
+import * as mammoth from 'mammoth';
+import * as Papa from 'papaparse';
 
 interface FileInfo {
     name: string;
@@ -11,14 +16,37 @@ interface FileManagerProps {
     onClose: () => void;
 }
 
+interface UploadProgress {
+    [key: string]: {
+        progress: number;
+        total: number;
+        filename: string;
+    };
+}
+
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
+const LARGE_FILE_SIZE = 10 * 1024 * 1024; // Files larger than 10MB use chunked upload
+
 export const FileManager = ({ onClose }: FileManagerProps) => {
     const [files, setFiles] = useState<FileInfo[]>([]);
+    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [currentPath, setCurrentPath] = useState<string>('.');
     const [pathHistory, setPathHistory] = useState<string[]>(['.']);
     const [confirmDelete, setConfirmDelete] = useState<{ file: FileInfo; show: boolean } | null>(null);
+    const [confirmBatchDelete, setConfirmBatchDelete] = useState<{ files: string[]; show: boolean } | null>(null);
+    const [confirmDownload, setConfirmDownload] = useState<{ file: FileInfo; show: boolean } | null>(null);
+    const [previewFile, setPreviewFile] = useState<{ file: FileInfo; content: string | null; type: string } | null>(null);
+    const [downloadProgress, setDownloadProgress] = useState<{ filename: string; progress: number } | null>(null);
+    const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
+    const [copySuccess, setCopySuccess] = useState(false);
+    
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const folderInputRef = useRef<HTMLInputElement>(null);
+    const previewContainerRef = useRef<HTMLDivElement>(null);
 
     const getAuthHeaders = (): Record<string, string> => {
         const auth = sessionStorage.getItem('gotty_auth');
@@ -58,6 +86,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         const newPath = currentPath === '.' ? folderName : `${currentPath}/${folderName}`;
         setPathHistory([...pathHistory, newPath]);
         setCurrentPath(newPath);
+        setSelectedFiles(new Set());
     };
 
     const navigateBack = () => {
@@ -65,6 +94,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             const newHistory = pathHistory.slice(0, -1);
             setPathHistory(newHistory);
             setCurrentPath(newHistory[newHistory.length - 1]);
+            setSelectedFiles(new Set());
         }
     };
 
@@ -72,34 +102,218 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         return currentPath === '.' ? fileName : `${currentPath}/${fileName}`;
     };
 
-    const handleUpload = async (event: Event) => {
-        const target = event.target as HTMLInputElement;
-        const file = target.files?.[0];
-        if (!file) return;
+    const toggleFileSelection = (fileName: string) => {
+        const newSelected = new Set(selectedFiles);
+        if (newSelected.has(fileName)) {
+            newSelected.delete(fileName);
+        } else {
+            newSelected.add(fileName);
+        }
+        setSelectedFiles(newSelected);
+    };
 
-        setUploading(true);
-        setError(null);
+    const uploadChunkedFile = async (file: File, relativePath: string) => {
+        const fileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        
+        setUploadProgress(prev => ({
+            ...prev,
+            [fileId]: { progress: 0, total: file.size, filename: file.name }
+        }));
 
-        const formData = new FormData();
-        formData.append('file', file);
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+            const start = chunkIndex * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
 
-        try {
-            const response = await fetch('api/upload', {
+            const formData = new FormData();
+            formData.append('chunk', chunk);
+            formData.append('chunkIndex', chunkIndex.toString());
+            formData.append('totalChunks', totalChunks.toString());
+            formData.append('fileId', fileId);
+            formData.append('filename', relativePath);
+            formData.append('path', currentPath);
+
+            const response = await fetch('api/upload-chunk', {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: formData,
             });
 
             if (!response.ok) {
-                throw new Error('Upload failed');
+                throw new Error(`Chunk ${chunkIndex} upload failed`);
+            }
+
+            setUploadProgress(prev => ({
+                ...prev,
+                [fileId]: { ...prev[fileId], progress: end }
+            }));
+        }
+
+        setUploadProgress(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[fileId];
+            return newProgress;
+        });
+    };
+
+    const handleBatchUpload = async (fileList: FileList) => {
+        setUploading(true);
+        setError(null);
+
+        try {
+            // Group files by size
+            const largeFiles: { file: File; path: string }[] = [];
+            const normalFiles: { file: File; path: string }[] = [];
+
+            for (let i = 0; i < fileList.length; i++) {
+                const file = fileList[i];
+                const relativePath = (file as any).webkitRelativePath || file.name;
+                
+                console.log(`Processing file: ${file.name}, webkitRelativePath: ${(file as any).webkitRelativePath}, using: ${relativePath}`);
+                
+                if (file.size > LARGE_FILE_SIZE) {
+                    largeFiles.push({ file, path: relativePath });
+                } else {
+                    normalFiles.push({ file, path: relativePath });
+                }
+            }
+
+            // Upload normal files in batch (with progress for each)
+            if (normalFiles.length > 0) {
+                const formData = new FormData();
+                formData.append('path', currentPath);
+                
+                // Show upload progress
+                const uploadId = `batch_${Date.now()}`;
+                let totalSize = 0;
+                
+                for (const { file, path } of normalFiles) {
+                    totalSize += file.size;
+                    // Create a new File object with the relative path as the name
+                    const renamedFile = new File([file], path, { type: file.type });
+                    formData.append('files', renamedFile);
+                }
+                
+                setUploadProgress(prev => ({
+                    ...prev,
+                    [uploadId]: { progress: 0, total: totalSize, filename: `批量上传 (${normalFiles.length} 个文件)` }
+                }));
+
+                // Use XMLHttpRequest to track upload progress
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            setUploadProgress(prev => ({
+                                ...prev,
+                                [uploadId]: { progress: e.loaded, total: e.total, filename: `批量上传 (${normalFiles.length} 个文件)` }
+                            }));
+                        }
+                    });
+                    
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            resolve(xhr.response);
+                        } else {
+                            reject(new Error('Batch upload failed'));
+                        }
+                    });
+                    
+                    xhr.addEventListener('error', () => reject(new Error('Batch upload failed')));
+                    
+                    xhr.open('POST', 'api/upload');
+                    
+                    // Add auth headers
+                    const auth = sessionStorage.getItem('gotty_auth');
+                    if (auth) {
+                        xhr.setRequestHeader('Authorization', `Basic ${auth}`);
+                    }
+                    
+                    xhr.send(formData);
+                });
+                
+                setUploadProgress(prev => {
+                    const newProgress = { ...prev };
+                    delete newProgress[uploadId];
+                    return newProgress;
+                });
+            }
+
+            // Upload large files with chunking (with individual progress)
+            for (const { file, path } of largeFiles) {
+                await uploadChunkedFile(file, path);
             }
 
             await loadFiles(currentPath);
-            target.value = ''; // Reset input
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Upload failed');
         } finally {
             setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            if (folderInputRef.current) folderInputRef.current.value = '';
+        }
+    };
+
+    const handleFileUpload = async (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        if (!target.files || target.files.length === 0) return;
+        await handleBatchUpload(target.files);
+    };
+
+    const handleFolderUpload = async (event: Event) => {
+        const target = event.target as HTMLInputElement;
+        if (!target.files || target.files.length === 0) return;
+        await handleBatchUpload(target.files);
+    };
+
+    const downloadWithProgress = async (url: string, filename: string) => {
+        setDownloadProgress({ filename, progress: 0 });
+
+        try {
+            const response = await fetch(url, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error('Download failed');
+            }
+
+            const contentLength = response.headers.get('Content-Length');
+            const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('Cannot read response');
+
+            const chunks: Uint8Array[] = [];
+            let received = 0;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                chunks.push(value);
+                received += value.length;
+
+                if (total > 0) {
+                    setDownloadProgress({ filename, progress: (received / total) * 100 });
+                }
+            }
+
+            const blob = new Blob(chunks as BlobPart[]);
+            const objectUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(objectUrl);
+            document.body.removeChild(a);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Download failed');
+        } finally {
+            setDownloadProgress(null);
         }
     };
 
@@ -108,30 +322,187 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             navigateToFolder(file.name);
         } else {
             const filePath = getFilePath(file.name);
-            try {
-                const response = await fetch(`api/download?file=${encodeURIComponent(filePath)}`, {
-                    method: 'GET',
-                    headers: getAuthHeaders()
-                });
-
-                if (!response.ok) {
-                    throw new Error('下载失败');
-                }
-
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = file.name;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : '下载失败');
-            }
+            await downloadWithProgress(
+                `api/download?file=${encodeURIComponent(filePath)}`,
+                file.name
+            );
         }
     };
+
+    const handleBatchDownload = async () => {
+        if (selectedFiles.size === 0) return;
+
+        setError(null);
+        const filePaths = Array.from(selectedFiles).map(name => getFilePath(name));
+
+        try {
+            const response = await fetch('api/batch-download', {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ files: filePaths }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Batch download failed');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'files.zip';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Batch download failed');
+        }
+    };
+
+    const handlePreview = async (file: FileInfo) => {
+        if (file.isDir) {
+            navigateToFolder(file.name);
+            return;
+        }
+
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        const imageMimeTypes = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp'];
+        const videoMimeTypes = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+        const codeMimeTypes = ['js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'sass', 'less', 'json', 'xml', 'yaml', 'yml', 'go', 'py', 'rb', 'java', 'c', 'cpp', 'h', 'hpp', 'rs', 'php', 'sh', 'bash', 'sql', 'r', 'swift', 'kt', 'dart'];
+        const textMimeTypes = ['txt', 'log', 'conf', 'config', 'ini', 'env'];
+        const markdownTypes = ['md', 'markdown'];
+        const htmlTypes = ['html', 'htm'];
+        const spreadsheetTypes = ['xlsx', 'xls', 'csv'];
+        const docTypes = ['docx'];
+
+        // Check if file type is supported for preview
+        const canPreview = imageMimeTypes.includes(ext) || videoMimeTypes.includes(ext) || codeMimeTypes.includes(ext) || textMimeTypes.includes(ext) || markdownTypes.includes(ext) || htmlTypes.includes(ext) || spreadsheetTypes.includes(ext) || docTypes.includes(ext);
+        
+        if (!canPreview) {
+            // Show custom dialog for unsupported file types
+            setConfirmDownload({ file, show: true });
+            return;
+        }
+
+        setError(null);
+        const filePath = getFilePath(file.name);
+
+        try {
+            const response = await fetch(`api/download?file=${encodeURIComponent(filePath)}&preview=true`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error('Preview failed');
+            }
+
+            if (imageMimeTypes.includes(ext)) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                setPreviewFile({ file, content: url, type: 'image' });
+            } else if (videoMimeTypes.includes(ext)) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                setPreviewFile({ file, content: url, type: 'video' });
+            } else if (markdownTypes.includes(ext)) {
+                const text = await response.text();
+                setPreviewFile({ file, content: text, type: 'markdown' });
+            } else if (htmlTypes.includes(ext)) {
+                const text = await response.text();
+                setPreviewFile({ file, content: text, type: 'html' });
+            } else if (codeMimeTypes.includes(ext) || textMimeTypes.includes(ext)) {
+                const text = await response.text();
+                setPreviewFile({ file, content: text, type: 'code' });
+            } else if (ext === 'csv') {
+                const text = await response.text();
+                setPreviewFile({ file, content: text, type: 'csv' });
+            } else if (ext === 'xlsx' || ext === 'xls') {
+                const arrayBuffer = await response.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const html = XLSX.utils.sheet_to_html(firstSheet, { header: '', footer: '' });
+                setPreviewFile({ file, content: html, type: 'xlsx' });
+            } else if (ext === 'docx') {
+                const arrayBuffer = await response.arrayBuffer();
+                const result = await mammoth.convertToHtml({ arrayBuffer });
+                setPreviewFile({ file, content: result.value, type: 'docx' });
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Preview failed');
+        }
+    };
+
+    const closePreview = () => {
+        if (previewFile?.type === 'image' && previewFile.content) {
+            window.URL.revokeObjectURL(previewFile.content);
+        }
+        if (previewFile?.type === 'video' && previewFile.content) {
+            window.URL.revokeObjectURL(previewFile.content);
+        }
+        // Exit fullscreen if active
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        }
+        setPreviewFile(null);
+        setIsPreviewFullscreen(false);
+        setCopySuccess(false);
+    };
+
+    const handleCopyContent = async () => {
+        if (!previewFile?.content) return;
+
+        try {
+            let textToCopy = previewFile.content;
+            
+            // For CSV, convert to plain text
+            if (previewFile.type === 'csv') {
+                textToCopy = previewFile.content;
+            }
+            
+            await navigator.clipboard.writeText(textToCopy);
+            setCopySuccess(true);
+            
+            // Reset success message after 2 seconds
+            setTimeout(() => {
+                setCopySuccess(false);
+            }, 2000);
+        } catch (err) {
+            console.error('Copy failed:', err);
+            setError('复制失败，请手动复制');
+        }
+    };
+
+    const toggleFullscreen = async () => {
+        if (!previewContainerRef.current) return;
+
+        try {
+            if (!document.fullscreenElement) {
+                await previewContainerRef.current.requestFullscreen();
+                setIsPreviewFullscreen(true);
+            } else {
+                await document.exitFullscreen();
+                setIsPreviewFullscreen(false);
+            }
+        } catch (err) {
+            console.error('Fullscreen error:', err);
+        }
+    };
+
+    // Listen for fullscreen change events
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsPreviewFullscreen(!!document.fullscreenElement);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        };
+    }, []);
 
     const handleDelete = (file: FileInfo) => {
         setConfirmDelete({ file, show: true });
@@ -156,8 +527,48 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             }
 
             await loadFiles(currentPath);
+            setSelectedFiles(prev => {
+                const newSelected = new Set(prev);
+                newSelected.delete(file.name);
+                return newSelected;
+            });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Delete failed');
+        }
+    };
+
+    const handleBatchDelete = () => {
+        if (selectedFiles.size === 0) return;
+        setConfirmBatchDelete({ files: Array.from(selectedFiles), show: true });
+    };
+
+    const confirmBatchDeleteAction = async () => {
+        if (!confirmBatchDelete) return;
+
+        const filesToDelete = confirmBatchDelete.files;
+        setConfirmBatchDelete(null);
+        setError(null);
+
+        try {
+            // Delete files one by one
+            for (const fileName of filesToDelete) {
+                const filePath = getFilePath(fileName);
+                const response = await fetch(`api/delete?file=${encodeURIComponent(filePath)}`, {
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to delete ${fileName}`);
+                }
+            }
+
+            await loadFiles(currentPath);
+            setSelectedFiles(new Set());
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Batch delete failed');
+            // Reload to show current state
+            await loadFiles(currentPath);
         }
     };
 
@@ -172,6 +583,198 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const formatDate = (timestamp: number): string => {
         const date = new Date(timestamp * 1000);
         return date.toLocaleString();
+    };
+
+    const renderPreview = () => {
+        if (!previewFile) return null;
+
+        // Get language from file extension for syntax highlighting
+        const getLanguage = (filename: string): string => {
+            const ext = filename.split('.').pop()?.toLowerCase() || '';
+            const langMap: { [key: string]: string } = {
+                'js': 'javascript',
+                'jsx': 'javascript',
+                'ts': 'typescript',
+                'tsx': 'typescript',
+                'py': 'python',
+                'rb': 'ruby',
+                'go': 'go',
+                'java': 'java',
+                'c': 'c',
+                'cpp': 'cpp',
+                'h': 'c',
+                'hpp': 'cpp',
+                'rs': 'rust',
+                'php': 'php',
+                'sh': 'bash',
+                'bash': 'bash',
+                'sql': 'sql',
+                'json': 'json',
+                'xml': 'xml',
+                'yaml': 'yaml',
+                'yml': 'yaml',
+                'css': 'css',
+                'scss': 'scss',
+                'sass': 'sass',
+                'less': 'less',
+                'html': 'html',
+                'htm': 'html',
+                'r': 'r',
+                'swift': 'swift',
+                'kt': 'kotlin',
+                'dart': 'dart',
+            };
+            return langMap[ext] || ext;
+        };
+
+        // Highlight code
+        const highlightCode = (code: string, language: string): string => {
+            try {
+                if (language && hljs.getLanguage(language)) {
+                    return hljs.highlight(code, { language }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            } catch (err) {
+                console.error('Highlight error:', err);
+                return code;
+            }
+        };
+
+        // Parse CSV to HTML table
+        const renderCsvTable = (csvContent: string): string => {
+            try {
+                const parsed = Papa.parse(csvContent, { header: true });
+                if (!parsed.data || parsed.data.length === 0) {
+                    return '<p>无法解析CSV文件或文件为空</p>';
+                }
+                const headers = parsed.meta.fields || [];
+                const rows = parsed.data as any[];
+                
+                return `
+                    <table>
+                        <thead>
+                            <tr>${headers.map(h => `<th>${h || ''}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                            ${rows.map(row => `<tr>${headers.map(h => `<td>${row[h] || ''}</td>`).join('')}</tr>`).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (err) {
+                console.error('CSV parse error:', err);
+                return '<p>解析CSV文件时出错</p>';
+            }
+        };
+
+        return (
+            <div className="preview-overlay" onClick={closePreview}>
+                <div 
+                    ref={previewContainerRef}
+                    className={`preview-container ${isPreviewFullscreen ? 'fullscreen' : ''}`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="preview-header">
+                        <h3>{previewFile.file.name}</h3>
+                        <div className="preview-header-actions">
+                            {(previewFile.type === 'code' || previewFile.type === 'csv') && (
+                                <button 
+                                    className={`preview-action-btn copy-btn ${copySuccess ? 'copy-success' : ''}`}
+                                    onClick={handleCopyContent}
+                                    title="复制内容"
+                                >
+                                    {copySuccess ? (
+                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                        </svg>
+                                    ) : (
+                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                        </svg>
+                                    )}
+                                </button>
+                            )}
+                            <button 
+                                className="preview-action-btn" 
+                                onClick={toggleFullscreen}
+                                title={isPreviewFullscreen ? '退出全屏' : '全屏'}
+                            >
+                                {isPreviewFullscreen ? (
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                                    </svg>
+                                ) : (
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                                    </svg>
+                                )}
+                            </button>
+                            <button className="preview-action-btn close-btn" onClick={closePreview} title="关闭">
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                    <div className="preview-body">
+                        {previewFile.type === 'image' && previewFile.content && (
+                            <img src={previewFile.content} alt={previewFile.file.name} />
+                        )}
+                        {previewFile.type === 'markdown' && previewFile.content && (
+                            <div 
+                                className="markdown-preview" 
+                                dangerouslySetInnerHTML={{ __html: marked(previewFile.content) as string }}
+                            />
+                        )}
+                        {previewFile.type === 'html' && previewFile.content && (
+                            <iframe 
+                                srcDoc={previewFile.content}
+                                className="html-preview"
+                                sandbox="allow-scripts"
+                            />
+                        )}
+                        {previewFile.type === 'code' && previewFile.content && (
+                            <pre className="code-preview">
+                                <code 
+                                    className={`hljs language-${getLanguage(previewFile.file.name)}`}
+                                    dangerouslySetInnerHTML={{ 
+                                        __html: highlightCode(previewFile.content, getLanguage(previewFile.file.name))
+                                    }}
+                                />
+                            </pre>
+                        )}
+                        {previewFile.type === 'video' && previewFile.content && (
+                            <video 
+                                className="video-preview" 
+                                controls 
+                                src={previewFile.content}
+                            >
+                                您的浏览器不支持视频播放
+                            </video>
+                        )}
+                        {previewFile.type === 'csv' && previewFile.content && (
+                            <div className="table-preview-container">
+                                <div 
+                                    className="csv-preview" 
+                                    dangerouslySetInnerHTML={{ __html: renderCsvTable(previewFile.content) }}
+                                />
+                            </div>
+                        )}
+                        {previewFile.type === 'xlsx' && previewFile.content && (
+                            <div className="table-preview-container">
+                                <div 
+                                    className="xlsx-preview" 
+                                    dangerouslySetInnerHTML={{ __html: previewFile.content }}
+                                />
+                            </div>
+                        )}
+                        {previewFile.type === 'docx' && previewFile.content && (
+                            <div 
+                                className="docx-preview" 
+                                dangerouslySetInnerHTML={{ __html: previewFile.content }}
+                            />
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     return (
@@ -204,18 +807,53 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                     </div>
 
                     <div className="upload-section">
-                        <label className="upload-btn">
-                            <input
-                                type="file"
-                                onChange={handleUpload}
-                                disabled={uploading}
-                                style={{ display: 'none' }}
-                            />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            multiple
+                            onChange={handleFileUpload}
+                            disabled={uploading}
+                            style={{ display: 'none' }}
+                        />
+                        <input
+                            ref={folderInputRef}
+                            type="file"
+                            // @ts-ignore - webkitdirectory is not standard
+                            webkitdirectory=""
+                            directory=""
+                            multiple
+                            onChange={handleFolderUpload}
+                            disabled={uploading}
+                            style={{ display: 'none' }}
+                        />
+                        <label className="upload-btn" onClick={() => fileInputRef.current?.click()}>
                             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                             </svg>
                             {uploading ? '上传中...' : '上传文件'}
                         </label>
+                        <label className="upload-btn" onClick={() => folderInputRef.current?.click()}>
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z" />
+                            </svg>
+                            {uploading ? '上传中...' : '上传文件夹'}
+                        </label>
+                        {selectedFiles.size > 0 && (
+                            <>
+                                <button className="batch-download-btn" onClick={handleBatchDownload}>
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                                    </svg>
+                                    下载选中 ({selectedFiles.size})
+                                </button>
+                                <button className="batch-delete-btn" onClick={handleBatchDelete}>
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                    </svg>
+                                    删除选中 ({selectedFiles.size})
+                                </button>
+                            </>
+                        )}
                         <button className="refresh-btn" onClick={() => loadFiles(currentPath)} disabled={loading}>
                             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
@@ -224,8 +862,49 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         </button>
                     </div>
 
+                    {Object.keys(uploadProgress).length > 0 && (
+                        <div className="upload-progress">
+                            {Object.entries(uploadProgress).map(([id, progress]) => (
+                                <div key={id} className="progress-item">
+                                    <div className="progress-info">
+                                        <span className="progress-filename">{progress.filename}</span>
+                                        <span className="progress-percent">
+                                            {Math.round((progress.progress / progress.total) * 100)}%
+                                        </span>
+                                    </div>
+                                    <div className="progress-bar">
+                                        <div 
+                                            className="progress-bar-fill" 
+                                            style={{ width: `${(progress.progress / progress.total) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {downloadProgress && (
+                        <div className="download-progress">
+                            <div className="progress-item">
+                                <div className="progress-info">
+                                    <span className="progress-filename">下载: {downloadProgress.filename}</span>
+                                    <span className="progress-percent">{Math.round(downloadProgress.progress)}%</span>
+                                </div>
+                                <div className="progress-bar">
+                                    <div 
+                                        className="progress-bar-fill" 
+                                        style={{ width: `${downloadProgress.progress}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {error && (
                         <div className="error-message">
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+                            </svg>
                             {error}
                         </div>
                     )}
@@ -237,16 +916,37 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             <table>
                                 <thead>
                                     <tr>
+                                        <th style={{ width: '40px' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedFiles.size === files.length && files.length > 0}
+                                                onChange={(e) => {
+                                                    const target = e.target as HTMLInputElement;
+                                                    if (target.checked) {
+                                                        setSelectedFiles(new Set(files.map(f => f.name)));
+                                                    } else {
+                                                        setSelectedFiles(new Set());
+                                                    }
+                                                }}
+                                            />
+                                        </th>
                                         <th>文件名</th>
                                         <th>大小</th>
-                                        <th>上传时间</th>
+                                        <th>修改时间</th>
                                         <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {files.map((file) => (
                                         <tr key={file.name} className={file.isDir ? 'folder-row' : ''}>
-                                            <td className="filename" onClick={() => file.isDir && navigateToFolder(file.name)}>
+                                            <td onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedFiles.has(file.name)}
+                                                    onChange={() => toggleFileSelection(file.name)}
+                                                />
+                                            </td>
+                                            <td className="filename" onClick={() => handlePreview(file)}>
                                                 <svg className="file-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                     {file.isDir ? (
                                                         <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
@@ -323,6 +1023,75 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                     </div>
                 </div>
             )}
+
+            {confirmBatchDelete?.show && (
+                <div className="confirm-dialog-overlay" onClick={() => setConfirmBatchDelete(null)}>
+                    <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                        <div className="confirm-dialog-header">
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                            </svg>
+                            <h3>确认批量删除</h3>
+                        </div>
+                        <div className="confirm-dialog-body">
+                            <p>确定要删除选中的 <strong>{confirmBatchDelete.files.length}</strong> 个文件/文件夹吗？</p>
+                            <p className="warning-text">注意：此操作不可恢复！</p>
+                            <div className="batch-delete-list">
+                                {confirmBatchDelete.files.slice(0, 10).map(fileName => (
+                                    <div key={fileName} className="batch-delete-item">{fileName}</div>
+                                ))}
+                                {confirmBatchDelete.files.length > 10 && (
+                                    <div className="batch-delete-more">还有 {confirmBatchDelete.files.length - 10} 个...</div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="confirm-dialog-footer">
+                            <button className="confirm-cancel-btn" onClick={() => setConfirmBatchDelete(null)}>
+                                取消
+                            </button>
+                            <button className="confirm-delete-btn" onClick={confirmBatchDeleteAction}>
+                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                </svg>
+                                删除全部
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {confirmDownload?.show && (
+                <div className="confirm-dialog-overlay" onClick={() => setConfirmDownload(null)}>
+                    <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+                        <div className="confirm-dialog-header">
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M11 15h2v-2h-2v2zm0-8h2V5h-2v2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+                            </svg>
+                            <h3>无法预览</h3>
+                        </div>
+                        <div className="confirm-dialog-body">
+                            <p>此文件类型 <strong>.{confirmDownload.file.name.split('.').pop()}</strong> 暂不支持在线预览。</p>
+                            <p>是否下载到本地查看？</p>
+                        </div>
+                        <div className="confirm-dialog-footer">
+                            <button className="confirm-cancel-btn" onClick={() => setConfirmDownload(null)}>
+                                取消
+                            </button>
+                            <button className="confirm-download-btn" onClick={() => {
+                                handleDownload(confirmDownload.file);
+                                setConfirmDownload(null);
+                            }}>
+                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                                </svg>
+                                下载文件
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {renderPreview()}
         </div>
     );
 };
