@@ -188,12 +188,17 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 const uploadId = `batch_${Date.now()}`;
                 let totalSize = 0;
                 
+                // Build arrays for files and their paths
+                const filePaths: string[] = [];
+                
                 for (const { file, path } of normalFiles) {
                     totalSize += file.size;
-                    // Create a new File object with the relative path as the name
-                    const renamedFile = new File([file], path, { type: file.type });
-                    formData.append('files', renamedFile);
+                    formData.append('files', file);
+                    filePaths.push(path);
                 }
+                
+                // Send paths as a JSON string
+                formData.append('filePaths', JSON.stringify(filePaths));
                 
                 setUploadProgress(prev => ({
                     ...prev,
@@ -818,13 +823,11 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         <input
                             ref={folderInputRef}
                             type="file"
-                            // @ts-ignore - webkitdirectory is not standard
-                            webkitdirectory=""
-                            directory=""
                             multiple
                             onChange={handleFolderUpload}
                             disabled={uploading}
                             style={{ display: 'none' }}
+                            {...({ webkitdirectory: 'true', directory: 'true' } as any)}
                         />
                         <label className="upload-btn" onClick={() => fileInputRef.current?.click()}>
                             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

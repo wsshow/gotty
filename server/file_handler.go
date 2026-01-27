@@ -63,6 +63,25 @@ func (server *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get file paths from form (for folder uploads)
+	filePathsJSON := r.FormValue("filePaths")
+	var filePaths []string
+	if filePathsJSON != "" {
+		if err := json.Unmarshal([]byte(filePathsJSON), &filePaths); err != nil {
+			log.Printf("Error parsing filePaths: %v", err)
+			filePaths = nil
+		}
+	}
+
+	// Ensure we have paths for all files, use filename as fallback
+	if len(filePaths) != len(files) {
+		log.Printf("Warning: filePaths length (%d) != files length (%d), using filenames", len(filePaths), len(files))
+		filePaths = make([]string, len(files))
+		for i, handler := range files {
+			filePaths[i] = handler.Filename
+		}
+	}
+
 	type UploadResult struct {
 		Filename string `json:"filename"`
 		Size     int64  `json:"size"`
@@ -71,15 +90,16 @@ func (server *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 	results := []UploadResult{}
 
-	for _, handler := range files {
+	for i, handler := range files {
 		file, err := handler.Open()
 		if err != nil {
 			log.Printf("Error opening file %s: %v", handler.Filename, err)
 			continue
 		}
 
-		// Get relative path from form (for folder uploads)
-		relativePath := handler.Filename
+		// Get relative path from filePaths array (for folder uploads)
+		relativePath := filePaths[i]
+		log.Printf("DEBUG: Processing file %d: handler.Filename=%s, relativePath=%s", i, handler.Filename, relativePath)
 
 		// Clean and validate the path
 		relativePath = filepath.Clean(relativePath)
@@ -189,7 +209,12 @@ func (server *Server) handleChunkUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	filename = filepath.Base(filename)
+	// Clean filename but keep relative path for folder uploads
+	filename = filepath.Clean(filename)
+	if strings.HasPrefix(filename, "..") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
 
 	// Create temp directory
 	tempDir := filepath.Join(tempUploadPath, fileId)
@@ -237,12 +262,20 @@ func (server *Server) handleChunkUpload(w http.ResponseWriter, r *http.Request) 
 
 		finalPath := filepath.Join(fullTargetPath, filename)
 
+		// Create parent directories for the file if needed (for folder uploads)
+		fileDir := filepath.Dir(finalPath)
+		if err := os.MkdirAll(fileDir, 0755); err != nil {
+			http.Error(w, fmt.Sprintf("Could not create directory for file: %v", err), http.StatusInternalServerError)
+			return
+		}
+
 		// Check if file exists and create unique name
 		if _, err := os.Stat(finalPath); err == nil {
-			ext := filepath.Ext(filename)
-			name := strings.TrimSuffix(filename, ext)
+			ext := filepath.Ext(finalPath)
+			baseNameWithoutExt := strings.TrimSuffix(filepath.Base(finalPath), ext)
+			dir := filepath.Dir(finalPath)
 			for i := 1; ; i++ {
-				finalPath = filepath.Join(fullTargetPath, fmt.Sprintf("%s_%d%s", name, i, ext))
+				finalPath = filepath.Join(dir, fmt.Sprintf("%s_%d%s", baseNameWithoutExt, i, ext))
 				if _, err := os.Stat(finalPath); os.IsNotExist(err) {
 					break
 				}
