@@ -20,6 +20,16 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const [pathHistory, setPathHistory] = useState<string[]>(['.']);
     const [confirmDelete, setConfirmDelete] = useState<{ file: FileInfo; show: boolean } | null>(null);
 
+    const getAuthHeaders = (): Record<string, string> => {
+        const auth = sessionStorage.getItem('gotty_auth');
+        if (auth) {
+            return {
+                'Authorization': `Basic ${auth}`
+            };
+        }
+        return {};
+    };
+
     useEffect(() => {
         loadFiles(currentPath);
     }, [currentPath]);
@@ -28,7 +38,9 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch(`api/files?path=${encodeURIComponent(path)}`);
+            const response = await fetch(`api/files?path=${encodeURIComponent(path)}`, {
+                headers: getAuthHeaders()
+            });
             if (!response.ok) {
                 throw new Error('Failed to load files');
             }
@@ -74,6 +86,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         try {
             const response = await fetch('api/upload', {
                 method: 'POST',
+                headers: getAuthHeaders(),
                 body: formData,
             });
 
@@ -114,6 +127,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             const filePath = getFilePath(file.name);
             const response = await fetch(`api/delete?file=${encodeURIComponent(filePath)}`, {
                 method: 'DELETE',
+                headers: getAuthHeaders()
             });
 
             if (!response.ok) {

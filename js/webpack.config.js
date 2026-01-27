@@ -58,7 +58,11 @@ module.exports = {
         minimize: true,
         minimizer: [new TerserPlugin({
             terserOptions: {
-                ecma: "2016"
+                ecma: "2016",
+                compress: {
+                    drop_console: true,
+                    drop_debugger: true
+                }
             }
         })],
     },

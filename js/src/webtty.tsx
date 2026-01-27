@@ -114,6 +114,11 @@ export class WebTTY {
     authToken: string;
 
     /*
+     * Connection error handler
+     */
+    onConnectionError?: () => void;
+
+    /*
      * If connection is dropped, reconnect after `reconnect` seconds.
      * -1 means do not reconnect.
      */
@@ -125,6 +130,11 @@ export class WebTTY {
      * into chunks small enough that we don't hurt the server's feelings.
      */
     bufSize: number;
+
+    /*
+     * Track connection open time for auth error detection
+     */
+    connectionOpenTime?: number;
 
     constructor(term: Terminal, connectionFactory: ConnectionFactory, args: string, authToken: string) {
         this.term = term;
@@ -143,6 +153,7 @@ export class WebTTY {
 
         const setup = () => {
             connection.onOpen(() => {
+                this.connectionOpenTime = Date.now();
                 const termInfo = this.term.info();
 
                 this.initializeConnection(this.args, this.authToken);
@@ -196,6 +207,17 @@ export class WebTTY {
             connection.onClose(() => {
                 clearInterval(pingTimer);
                 this.term.deactivate();
+
+                // Check if this was an authentication error (WebSocket closed immediately)
+                // If connection closes within 1 second, likely an auth error
+                const now = Date.now();
+                if (this.connectionOpenTime && (now - this.connectionOpenTime) < 1000) {
+                    if (this.onConnectionError) {
+                        this.onConnectionError();
+                        return;
+                    }
+                }
+
                 this.term.showMessage("Connection Closed", 0);
                 if (this.reconnect > 0) {
                     reconnectTimeout = setTimeout(() => {

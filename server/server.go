@@ -217,6 +217,9 @@ func (server *Server) setupHandlers(ctx context.Context, cancel context.CancelFu
 	siteMux.HandleFunc(pathPrefix+"auth_token.js", server.handleAuthToken)
 	siteMux.HandleFunc(pathPrefix+"config.js", server.handleConfig)
 
+	// Authentication endpoint (not protected by basic auth)
+	siteMux.HandleFunc(pathPrefix+"api/auth/verify", server.handleAuthVerify)
+
 	// File management endpoints
 	siteMux.HandleFunc(pathPrefix+"api/upload", server.handleFileUpload)
 	siteMux.HandleFunc(pathPrefix+"api/download", server.handleFileDownload)

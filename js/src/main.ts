@@ -2,6 +2,7 @@ import { ConnectionFactory } from "./websocket";
 import { Terminal, WebTTY, protocols } from "./webtty";
 import { GoTTYXterm } from "./xterm";
 import { FileManager } from "./FileManager";
+import { Login } from "./Login";
 import { h, render } from "preact";
 
 // Type-safe access to server-injected global variables
@@ -9,35 +10,83 @@ interface GoTTYWindow extends Window {
     gotty_auth_token?: string;
     gotty_term?: string;
     gotty_ws_query_args?: string;
+    gotty_enable_auth?: boolean;
 }
 
 const gottyWindow = window as GoTTYWindow;
 
-const elem = document.getElementById("terminal")
+// Check if authentication is required
+const authRequired = gottyWindow.gotty_enable_auth === true;
+const storedAuth = sessionStorage.getItem('gotty_auth');
 
-if (elem !== null) {
-    var term: Terminal;
-    term = new GoTTYXterm(elem);
+const initTerminal = (authToken: string = '') => {
+    const elem = document.getElementById("terminal");
 
-    const httpsEnabled = window.location.protocol == "https:";
-    const queryArgs = (gottyWindow.gotty_ws_query_args || "") === "" ? "" : "?" + (gottyWindow.gotty_ws_query_args || "");
-    const url = (httpsEnabled ? 'wss://' : 'ws://') + window.location.host + window.location.pathname + 'ws' + queryArgs;
-    const args = window.location.search;
-    const factory = new ConnectionFactory(url, protocols);
-    const wt = new WebTTY(term, factory, args, gottyWindow.gotty_auth_token || "");
-    const closer = wt.open();
+    if (elem !== null) {
+        var term: Terminal;
+        term = new GoTTYXterm(elem);
 
-    // Cleanup on page visibility change or navigation
-    // Using 'pagehide' instead of deprecated 'unload' event
-    window.addEventListener("pagehide", () => {
-        closer();
-        term.close();
-    });
+        const httpsEnabled = window.location.protocol == "https:";
+        let queryArgs = (gottyWindow.gotty_ws_query_args || "") === "" ? "" : "?" + (gottyWindow.gotty_ws_query_args || "");
+
+        // Add auth token to query if authentication is enabled
+        if (authRequired && authToken) {
+            queryArgs = queryArgs ? queryArgs + "&auth=" + encodeURIComponent(authToken) : "?auth=" + encodeURIComponent(authToken);
+            console.log('[GoTTY] Auth enabled, token length:', authToken.length);
+        }
+
+        const url = (httpsEnabled ? 'wss://' : 'ws://') + window.location.host + window.location.pathname + 'ws' + queryArgs;
+        console.log('[GoTTY] Connecting to:', url.replace(/auth=[^&]+/, 'auth=***'));
+        const args = window.location.search;
+        const factory = new ConnectionFactory(url, protocols);
+        const wt = new WebTTY(term, factory, args, authToken || gottyWindow.gotty_auth_token || "");
+
+        // Set up connection error handler for auth failures
+        wt.onConnectionError = () => {
+            if (authRequired) {
+                // Clear stored auth and reload to show login
+                sessionStorage.removeItem('gotty_auth');
+                window.location.reload();
+            }
+        };
+
+        const closer = wt.open();
+
+        // Cleanup on page visibility change or navigation
+        // Using 'pagehide' instead of deprecated 'unload' event
+        window.addEventListener("pagehide", () => {
+            closer();
+            term.close();
+        });
+    }
 };
 
-// File Manager Integration
-const fileManagerBtn = document.getElementById("file-manager-btn") as HTMLElement | null;
-if (fileManagerBtn) {
+// Show login if auth is required and not authenticated
+if (authRequired && !storedAuth) {
+    const loginContainer = document.createElement("div");
+    loginContainer.id = "login-container";
+    document.body.appendChild(loginContainer);
+
+    render(
+        h(Login, {
+            onSuccess: (token: string) => {
+                render(null, loginContainer);
+                document.body.removeChild(loginContainer);
+                initTerminal(token);
+                initFileManager();
+            }
+        }),
+        loginContainer
+    );
+} else {
+    initTerminal(storedAuth || '');
+    initFileManager();
+}
+
+function initFileManager() {
+    const fileManagerBtn = document.getElementById("file-manager-btn") as HTMLElement | null;
+    if (!fileManagerBtn) return;
+
     let fileManagerContainer: HTMLDivElement | null = null;
 
     // Draggable functionality

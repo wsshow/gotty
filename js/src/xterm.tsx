@@ -137,8 +137,12 @@ export class GoTTYXterm {
     };
 
     deactivate(): void {
-        this.onDataHandler.dispose();
-        this.onResizeHandler.dispose();
+        if (this.onDataHandler) {
+            this.onDataHandler.dispose();
+        }
+        if (this.onResizeHandler) {
+            this.onResizeHandler.dispose();
+        }
         this.term.blur();
     }
 

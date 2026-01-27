@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -66,6 +67,47 @@ func (server *Server) generateHandleWS(ctx context.Context, cancel context.Cance
 			return
 		}
 
+		// Verify authentication if BasicAuth is enabled
+		if server.options.EnableBasicAuth {
+			// Try to get auth from query parameter first (for WebSocket)
+			authToken := r.URL.Query().Get("auth")
+			if authToken != "" {
+				// Decode the base64 auth token
+				payload, err := base64.StdEncoding.DecodeString(authToken)
+				if err != nil {
+					log.Printf("[GoTTY] Failed to decode auth token: %v", err)
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				if server.options.Credential != string(payload) {
+					log.Printf("[GoTTY] Invalid credentials from query: got '%s', expected '%s'", string(payload), server.options.Credential)
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				log.Printf("[GoTTY] WebSocket auth successful via query parameter")
+			} else {
+				// Fall back to Authorization header
+				token := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+				if len(token) != 2 || strings.ToLower(token[0]) != "basic" {
+					log.Printf("[GoTTY] Invalid Authorization header format")
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				payload, err := base64.StdEncoding.DecodeString(token[1])
+				if err != nil {
+					log.Printf("[GoTTY] Failed to decode Authorization header: %v", err)
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				if server.options.Credential != string(payload) {
+					log.Printf("[GoTTY] Invalid credentials from header: got '%s', expected '%s'", string(payload), server.options.Credential)
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				log.Printf("[GoTTY] WebSocket auth successful via Authorization header")
+			}
+		}
+
 		conn, err := server.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			closeReason = err.Error()
@@ -106,9 +148,14 @@ func (server *Server) processWSConn(ctx context.Context, conn *websocket.Conn, h
 	if err != nil {
 		return errors.Wrapf(err, "failed to authenticate websocket connection")
 	}
-	if init.AuthToken != server.options.Credential {
+
+	// Decode base64 auth token and compare with credential
+	decodedAuth, err := base64.StdEncoding.DecodeString(init.AuthToken)
+	if err != nil || string(decodedAuth) != server.options.Credential {
+		log.Printf("[GoTTY] WebSocket init auth failed: decoded='%s', expected='%s', decode_err=%v", string(decodedAuth), server.options.Credential, err)
 		return errors.New("failed to authenticate websocket connection")
 	}
+	log.Printf("[GoTTY] WebSocket initialization authenticated successfully")
 
 	queryPath := "?"
 	if server.options.PermitArguments && init.Arguments != "" {
@@ -237,6 +284,12 @@ func (server *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	lines := []string{
 		"var gotty_term = 'xterm';",
 		"var gotty_ws_query_args = '" + server.options.WSQueryArgs + "';",
+	}
+
+	if server.options.EnableBasicAuth {
+		lines = append(lines, "var gotty_enable_auth = true;")
+	} else {
+		lines = append(lines, "var gotty_enable_auth = false;")
 	}
 
 	w.Write([]byte(strings.Join(lines, "\n")))

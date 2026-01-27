@@ -25,6 +25,22 @@ func (server *Server) wrapHeaders(handler http.Handler) http.Handler {
 
 func (server *Server) wrapBasicAuth(handler http.Handler, credential string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Allow these paths without authentication to load login UI
+		if r.URL.Path == "/" ||
+			strings.HasPrefix(r.URL.Path, "/js/") ||
+			strings.HasPrefix(r.URL.Path, "/css/") ||
+			strings.HasPrefix(r.URL.Path, "/icon") ||
+			strings.HasSuffix(r.URL.Path, ".js") ||
+			strings.HasSuffix(r.URL.Path, ".css") ||
+			strings.HasSuffix(r.URL.Path, ".json") ||
+			strings.HasSuffix(r.URL.Path, ".png") ||
+			strings.HasSuffix(r.URL.Path, ".svg") ||
+			strings.HasSuffix(r.URL.Path, ".ico") ||
+			strings.HasSuffix(r.URL.Path, "/api/auth/verify") {
+			handler.ServeHTTP(w, r)
+			return
+		}
+
 		token := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
 
 		if len(token) != 2 || strings.ToLower(token[0]) != "basic" {
