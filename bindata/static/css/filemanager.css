@@ -203,6 +203,7 @@
 .files-list tbody tr {
     border-bottom: 1px solid #2a2a2a;
     transition: background 0.15s;
+    height: 52px;
 }
 
 .files-list tbody tr:hover {
@@ -210,12 +211,14 @@
 }
 
 .files-list td {
-    padding: 12px 16px;
+    padding: 0 16px;
     color: #cccccc;
     font-size: 14px;
+    vertical-align: middle;
+    height: 52px;
 }
 
-.files-list .filename {
+.files-list td.filename {
     color: #ffffff;
     font-weight: 400;
     display: flex;
@@ -224,11 +227,11 @@
     position: relative;
 }
 
-.folder-row .filename {
+.folder-row td.filename {
     cursor: pointer;
 }
 
-.folder-row:hover .filename {
+.folder-row:hover td.filename {
     color: #5dade2;
 }
 

@@ -103,12 +103,33 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         }
     };
 
-    const handleDownload = (file: FileInfo) => {
+    const handleDownload = async (file: FileInfo) => {
         if (file.isDir) {
             navigateToFolder(file.name);
         } else {
             const filePath = getFilePath(file.name);
-            window.location.href = `api/download?file=${encodeURIComponent(filePath)}`;
+            try {
+                const response = await fetch(`api/download?file=${encodeURIComponent(filePath)}`, {
+                    method: 'GET',
+                    headers: getAuthHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error('下载失败');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : '下载失败');
+            }
         }
     };
 
