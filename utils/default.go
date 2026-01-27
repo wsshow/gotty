@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/fatih/structs"
 	"reflect"
 	"strconv"
+
+	"github.com/fatih/structs"
 )
 
 func ApplyDefaultValues(struct_ interface{}) (err error) {
@@ -15,16 +16,17 @@ func ApplyDefaultValues(struct_ interface{}) (err error) {
 		if defaultValue == "" {
 			continue
 		}
-		var val interface{}
+		var val any
 		switch field.Kind() {
 		case reflect.String:
 			val = defaultValue
 		case reflect.Bool:
-			if defaultValue == "true" {
+			switch defaultValue {
+			case "true":
 				val = true
-			} else if defaultValue == "false" {
+			case "false":
 				val = false
-			} else {
+			default:
 				return fmt.Errorf("invalid bool expression: %v, use true/false", defaultValue)
 			}
 		case reflect.Int:

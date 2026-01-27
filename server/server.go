@@ -19,10 +19,10 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 
-	"github.com/wsshow/gotty/bindata"
-	"github.com/wsshow/gotty/pkg/homedir"
-	"github.com/wsshow/gotty/pkg/randomstring"
-	"github.com/wsshow/gotty/webtty"
+	"gotty/bindata"
+	"gotty/pkg/homedir"
+	"gotty/pkg/randomstring"
+	"gotty/webtty"
 )
 
 // Server provides a webtty HTTP endpoint.

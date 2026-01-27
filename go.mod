@@ -1,4 +1,4 @@
-module github.com/wsshow/gotty
+module gotty
 
 go 1.23
 

@@ -4,7 +4,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wsshow/gotty/server"
+	"gotty/server"
 )
 
 type Options struct {

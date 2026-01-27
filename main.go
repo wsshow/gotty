@@ -12,18 +12,21 @@ import (
 
 	cli "github.com/urfave/cli/v2"
 
-	"github.com/wsshow/gotty/backend/localcommand"
-	"github.com/wsshow/gotty/pkg/homedir"
-	"github.com/wsshow/gotty/server"
-	"github.com/wsshow/gotty/utils"
-	"github.com/wsshow/gotty/version"
+	"gotty/backend/localcommand"
+
+	"gotty/pkg/homedir"
+
+	"gotty/server"
+	"gotty/utils"
+	"gotty/version"
 )
 
 func main() {
 	app := cli.NewApp()
 	app.Name = "gotty"
-	app.Version = version.Get().Version
+	app.Version = fmt.Sprintf("%s (%s)", version.Get().Version, version.Get().BuildTime)
 	app.Usage = "Share your terminal as a web application"
+	app.Authors = []*cli.Author{{Name: "wsshow"}}
 	app.HideHelpCommand = true
 	appOptions := &server.Options{}
 
