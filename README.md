@@ -1,10 +1,16 @@
+<div align="center">
+
 # GoTTY
 
 [![Go Version](https://img.shields.io/badge/Go-1.23-blue.svg)](https://golang.org)
 [![Node Version](https://img.shields.io/badge/Node-22-green.svg)](https://nodejs.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-将您的终端作为Web应用程序共享。GoTTY是一个简单的命令行工具，可以将命令行工具转换为Web应用程序。
+**将您的终端作为Web应用程序共享**
+
+GoTTY是一个简单的命令行工具，可以将命令行工具转换为Web应用程序
+
+</div>
 
 ## ✨ 主要特性
 
