@@ -23,10 +23,9 @@ if (elem !== null) {
     const wt = new WebTTY(term, factory, args, gotty_auth_token);
     const closer = wt.open();
 
-    // According to https://developer.mozilla.org/en-US/docs/Web/API/Window/unload_event
-    // this event is unreliable and in some cases (Firefox is mentioned), having an
-    // "unload" event handler can have unwanted side effects. Consider commenting it out.
-    window.addEventListener("unload", () => {
+    // Cleanup on page visibility change or navigation
+    // Using 'pagehide' instead of deprecated 'unload' event
+    window.addEventListener("pagehide", () => {
         closer();
         term.close();
     });
