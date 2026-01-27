@@ -45,8 +45,6 @@ jobs:
           cp resources/filemanager.css bindata/static/css/
           cp resources/login.css bindata/static/css/
           cp js/node_modules/@xterm/xterm/css/xterm.css bindata/static/css/
-          cp js/dist/gotty.js bindata/static/js/
-          cp js/dist/gotty.js.map bindata/static/js/
 
       - name: Set up Go
         uses: actions/setup-go@v6
