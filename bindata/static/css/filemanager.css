@@ -5,61 +5,71 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 9999;
+    backdrop-filter: blur(2px);
 }
 
 .file-manager {
-    background: #1e1e1e;
+    background: #1a1a1a;
+    border: 1px solid #333;
     border-radius: 8px;
     width: 90%;
     max-width: 900px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
 }
 
 .file-manager-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px;
+    padding: 16px 20px;
     border-bottom: 1px solid #333;
+    background: #1e1e1e;
+    border-radius: 8px 8px 0 0;
 }
 
 .file-manager-header h2 {
     margin: 0;
-    color: #fff;
-    font-size: 20px;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 500;
 }
 
 .close-btn {
-    background: none;
+    background: transparent;
     border: none;
-    color: #fff;
-    font-size: 32px;
+    color: #888;
+    font-size: 28px;
     cursor: pointer;
     padding: 0;
+    margin: 0;
     width: 32px;
     height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
-    line-height: 1;
+    line-height: 0;
+    border-radius: 4px;
+    transition: all 0.2s;
 }
 
 .close-btn:hover {
-    color: #f44336;
+    background: #2d2d2d;
+    color: #ffffff;
 }
 
 .file-manager-body {
     padding: 20px;
     overflow: auto;
     flex: 1;
+    background: #1a1a1a;
 }
 
 .upload-section {
@@ -70,48 +80,48 @@
 
 .upload-btn,
 .refresh-btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
+    padding: 8px 16px;
+    border: 1px solid #333;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
-    transition: all 0.3s;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #2d2d2d;
+    color: #ffffff;
 }
 
-.upload-btn {
-    background: #4CAF50;
-    color: white;
+.upload-btn svg,
+.refresh-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
 }
 
-.upload-btn:hover {
-    background: #45a049;
-}
-
-.upload-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-}
-
-.refresh-btn {
-    background: #2196F3;
-    color: white;
-}
-
+.upload-btn:hover,
 .refresh-btn:hover {
-    background: #0b7dda;
+    background: #3d3d3d;
+    border-color: #444;
 }
 
+.upload-btn:disabled,
 .refresh-btn:disabled {
-    background: #ccc;
+    background: #252525;
+    color: #666;
     cursor: not-allowed;
+    border-color: #2a2a2a;
 }
 
 .error-message {
-    background: #f44336;
-    color: white;
-    padding: 10px;
-    border-radius: 4px;
-    margin-bottom: 15px;
+    background: #3d1f1f;
+    color: #ff6b6b;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    border: 1px solid #5d2f2f;
+    font-size: 14px;
 }
 
 .files-list {
@@ -124,87 +134,197 @@
 }
 
 .files-list thead {
-    background: #2c2c2c;
+    background: #252525;
 }
 
 .files-list th {
-    padding: 12px;
+    padding: 12px 16px;
     text-align: left;
-    color: #fff;
-    font-weight: 600;
-}
-
-.files-list tbody tr {
+    color: #aaaaaa;
+    font-weight: 500;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     border-bottom: 1px solid #333;
 }
 
+.files-list tbody tr {
+    border-bottom: 1px solid #2a2a2a;
+    transition: background 0.15s;
+}
+
 .files-list tbody tr:hover {
-    background: #2c2c2c;
+    background: #252525;
 }
 
 .files-list td {
-    padding: 12px;
-    color: #ccc;
+    padding: 12px 16px;
+    color: #cccccc;
+    font-size: 14px;
 }
 
 .files-list .filename {
-    color: #fff;
-    font-weight: 500;
+    color: #ffffff;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-icon {
+    width: 20px;
+    height: 20px;
+    fill: #888;
+    flex-shrink: 0;
 }
 
 .action-btn {
-    padding: 6px 12px;
-    border: none;
+    padding: 6px 10px;
+    border: 1px solid transparent;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
-    margin-right: 5px;
-    transition: all 0.3s;
+    font-size: 0;
+    margin-right: 6px;
+    transition: all 0.2s;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
 }
 
-.download-btn {
-    background: #2196F3;
-    color: white;
+.action-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: #888;
+}
+
+.action-btn:hover {
+    background: #2d2d2d;
+    border-color: #444;
+}
+
+.action-btn:hover svg {
+    fill: #ffffff;
 }
 
 .download-btn:hover {
-    background: #0b7dda;
+    background: #1e3a5f;
+    border-color: #2d5a8f;
 }
 
-.delete-btn {
-    background: #f44336;
-    color: white;
+.download-btn:hover svg {
+    fill: #5dade2;
 }
 
 .delete-btn:hover {
-    background: #da190b;
+    background: #4a1f1f;
+    border-color: #6d2f2f;
+}
+
+.delete-btn:hover svg {
+    fill: #ff6b6b;
 }
 
 .no-files {
     text-align: center;
-    padding: 40px;
-    color: #999;
-    font-size: 16px;
+    padding: 60px 20px;
+    color: #666;
+    font-size: 15px;
 }
 
 /* File Manager Button in Terminal */
 .file-manager-btn {
     position: fixed;
     top: 20px;
-    right: 30px;
-    padding: 10px 20px;
-    background: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    background: #1e1e1e;
+    color: #ffffff;
+    border: 1px solid #333;
+    border-radius: 8px;
+    cursor: move;
     font-size: 14px;
     z-index: 1000;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    touch-action: none;
 }
 
 .file-manager-btn:hover {
-    background: #45a049;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    background: #2d2d2d;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transform: scale(1.05);
+}
+
+.file-manager-btn:active {
+    cursor: grabbing;
+}
+
+.file-manager-btn.dragging {
+    transition: none;
+    cursor: grabbing;
+}
+
+.file-manager-btn.snapped-left {
+    width: 32px;
+    height: 32px;
+    border-radius: 0 8px 8px 0;
+}
+
+.file-manager-btn.snapped-right {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px 0 0 8px;
+}
+
+.file-manager-btn.snapped-top {
+    width: 32px;
+    height: 32px;
+    border-radius: 0 0 8px 8px;
+}
+
+.file-manager-btn.snapped-bottom {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px 8px 0 0;
+}
+
+.file-manager-btn.snapped-left:hover,
+.file-manager-btn.snapped-right:hover,
+.file-manager-btn.snapped-top:hover,
+.file-manager-btn.snapped-bottom:hover {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+}
+
+.file-manager-btn.snapped-left .file-manager-icon,
+.file-manager-btn.snapped-right .file-manager-icon,
+.file-manager-btn.snapped-top .file-manager-icon,
+.file-manager-btn.snapped-bottom .file-manager-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.file-manager-btn.snapped-left:hover .file-manager-icon,
+.file-manager-btn.snapped-right:hover .file-manager-icon,
+.file-manager-btn.snapped-top:hover .file-manager-icon,
+.file-manager-btn.snapped-bottom:hover .file-manager-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.file-manager-icon {
+    width: 24px;
+    height: 24px;
+    fill: #ffffff;
+    pointer-events: none;
 }

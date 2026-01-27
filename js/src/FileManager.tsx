@@ -122,9 +122,15 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                 disabled={uploading}
                                 style={{ display: 'none' }}
                             />
-                            {uploading ? '上传中...' : '选择文件上传'}
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+                            </svg>
+                            {uploading ? '上传中...' : '上传文件'}
                         </label>
                         <button className="refresh-btn" onClick={loadFiles} disabled={loading}>
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                            </svg>
                             {loading ? '加载中...' : '刷新'}
                         </button>
                     </div>
@@ -151,21 +157,32 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                 <tbody>
                                     {files.map((file) => (
                                         <tr key={file.name}>
-                                            <td className="filename">{file.name}</td>
+                                            <td className="filename">
+                                                <svg className="file-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                                                </svg>
+                                                {file.name}
+                                            </td>
                                             <td>{formatSize(file.size)}</td>
                                             <td>{formatDate(file.time)}</td>
                                             <td>
                                                 <button
                                                     className="action-btn download-btn"
                                                     onClick={() => handleDownload(file.name)}
+                                                    title="下载"
                                                 >
-                                                    下载
+                                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                                                    </svg>
                                                 </button>
                                                 <button
                                                     className="action-btn delete-btn"
                                                     onClick={() => handleDelete(file.name)}
+                                                    title="删除"
                                                 >
-                                                    删除
+                                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                                    </svg>
                                                 </button>
                                             </td>
                                         </tr>
