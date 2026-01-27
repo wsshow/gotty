@@ -72,6 +72,58 @@
     background: #1a1a1a;
 }
 
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #252525;
+    border-radius: 6px;
+    border: 1px solid #333;
+}
+
+.breadcrumb-btn {
+    background: transparent;
+    border: 1px solid #333;
+    color: #888;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    width: 32px;
+    height: 32px;
+}
+
+.breadcrumb-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.breadcrumb-btn:hover:not(:disabled) {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #ffffff;
+}
+
+.breadcrumb-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.current-path {
+    color: #cccccc;
+    font-size: 14px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .upload-section {
     display: flex;
     gap: 10px;
@@ -169,6 +221,26 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    position: relative;
+}
+
+.folder-row .filename {
+    cursor: pointer;
+}
+
+.folder-row:hover .filename {
+    color: #5dade2;
+}
+
+.folder-arrow {
+    width: 16px;
+    height: 16px;
+    fill: #888;
+    margin-left: auto;
+}
+
+.folder-row:hover .folder-arrow {
+    fill: #5dade2;
 }
 
 .file-icon {
@@ -327,4 +399,152 @@
     height: 24px;
     fill: #ffffff;
     pointer-events: none;
+}
+
+/* Confirm Dialog */
+.confirm-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.confirm-dialog {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.confirm-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #333;
+    background: #252525;
+    border-radius: 8px 8px 0 0;
+}
+
+.confirm-dialog-header svg {
+    width: 24px;
+    height: 24px;
+    fill: #ffa726;
+    flex-shrink: 0;
+}
+
+.confirm-dialog-header h3 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.confirm-dialog-body {
+    padding: 24px;
+}
+
+.confirm-dialog-body p {
+    margin: 0 0 12px 0;
+    color: #cccccc;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.confirm-dialog-body p:last-child {
+    margin-bottom: 0;
+}
+
+.confirm-dialog-body strong {
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.warning-text {
+    color: #ff6b6b !important;
+    font-size: 13px !important;
+    margin-top: 12px !important;
+}
+
+.confirm-dialog-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid #333;
+    background: #1a1a1a;
+    border-radius: 0 0 8px 8px;
+    justify-content: flex-end;
+}
+
+.confirm-cancel-btn,
+.confirm-delete-btn {
+    padding: 8px 20px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.confirm-cancel-btn {
+    background: transparent;
+    color: #cccccc;
+}
+
+.confirm-cancel-btn:hover {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #ffffff;
+}
+
+.confirm-delete-btn {
+    background: #5d2f2f;
+    color: #ffffff;
+    border-color: #6d2f2f;
+}
+
+.confirm-delete-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+.confirm-delete-btn:hover {
+    background: #7d3f3f;
+    border-color: #8d4f4f;
 }

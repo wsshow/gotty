@@ -94,8 +94,13 @@ func (server *Server) handleFileDownload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Sanitize filename to prevent directory traversal
-	filename = filepath.Base(filename)
+	// Sanitize filename to prevent directory traversal attacks
+	filename = filepath.Clean(filename)
+	if strings.HasPrefix(filename, "..") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+
 	filePath := filepath.Join(uploadPath, filename)
 
 	// Check if file exists
@@ -131,10 +136,23 @@ func (server *Server) handleFileDownload(w http.ResponseWriter, r *http.Request)
 	log.Printf("File downloaded: %s (size: %d bytes)", filename, fileInfo.Size())
 }
 
-// handleFileList lists all available files
+// handleFileList lists all available files and folders
 func (server *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get path from query parameter (relative to uploadPath)
+	subPath := r.URL.Query().Get("path")
+	if subPath == "" {
+		subPath = "."
+	}
+
+	// Sanitize path to prevent directory traversal
+	subPath = filepath.Clean(subPath)
+	if strings.HasPrefix(subPath, "..") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
 
@@ -144,8 +162,22 @@ func (server *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build full path
+	fullPath := filepath.Join(uploadPath, subPath)
+
+	// Check if path exists and is a directory
+	fileInfo, err := os.Stat(fullPath)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Could not access path: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if !fileInfo.IsDir() {
+		http.Error(w, "Path is not a directory", http.StatusBadRequest)
+		return
+	}
+
 	// Read directory contents
-	entries, err := os.ReadDir(uploadPath)
+	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Could not read directory: %v", err), http.StatusInternalServerError)
 		return
@@ -154,17 +186,22 @@ func (server *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 	// Build file list
 	var files []map[string]interface{}
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			info, err := entry.Info()
-			if err != nil {
-				continue
-			}
-			files = append(files, map[string]interface{}{
-				"name": entry.Name(),
-				"size": info.Size(),
-				"time": info.ModTime().Unix(),
-			})
+		info, err := entry.Info()
+		if err != nil {
+			continue
 		}
+
+		fileEntry := map[string]interface{}{
+			"name":  entry.Name(),
+			"isDir": entry.IsDir(),
+			"time":  info.ModTime().Unix(),
+		}
+
+		if !entry.IsDir() {
+			fileEntry["size"] = info.Size()
+		}
+
+		files = append(files, fileEntry)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -176,10 +213,15 @@ func (server *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 		if i > 0 {
 			fmt.Fprintf(w, ",")
 		}
-		fmt.Fprintf(w, `{"name": "%s", "size": %d, "time": %d}`,
-			file["name"], file["size"], file["time"])
+		if file["isDir"].(bool) {
+			fmt.Fprintf(w, `{"name": "%s", "isDir": true, "time": %d}`,
+				file["name"], file["time"])
+		} else {
+			fmt.Fprintf(w, `{"name": "%s", "isDir": false, "size": %d, "time": %d}`,
+				file["name"], file["size"], file["time"])
+		}
 	}
-	fmt.Fprintf(w, `]}`)
+	fmt.Fprintf(w, `], "currentPath": "%s"}`, subPath)
 }
 
 // handleFileDelete handles file deletion requests
@@ -196,23 +238,40 @@ func (server *Server) handleFileDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sanitize filename to prevent directory traversal
-	filename = filepath.Base(filename)
+	// Sanitize filename to prevent directory traversal attacks
+	filename = filepath.Clean(filename)
+	if strings.HasPrefix(filename, "..") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+
 	filePath := filepath.Join(uploadPath, filename)
 
-	// Check if file exists
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		http.Error(w, "File not found", http.StatusNotFound)
+	// Check if file/folder exists
+	fileInfo, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		http.Error(w, "File or folder not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Could not access file: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Delete the file
-	if err := os.Remove(filePath); err != nil {
-		http.Error(w, fmt.Sprintf("Could not delete file: %v", err), http.StatusInternalServerError)
-		return
+	// Delete the file or folder (recursively if it's a directory)
+	if fileInfo.IsDir() {
+		if err := os.RemoveAll(filePath); err != nil {
+			http.Error(w, fmt.Sprintf("Could not delete folder: %v", err), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("Folder deleted: %s", filename)
+	} else {
+		if err := os.Remove(filePath); err != nil {
+			http.Error(w, fmt.Sprintf("Could not delete file: %v", err), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("File deleted: %s", filename)
 	}
-
-	log.Printf("File deleted: %s", filename)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
