@@ -14,9 +14,40 @@ builds:
       - linux
       - windows
       - darwin
+      - freebsd
+      - netbsd
+      - openbsd
+      - solaris
     goarch:
+      - "386"
       - amd64
+      - arm
       - arm64
+    goarm:
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+      - goos: solaris
+        goarch: "386"
+      - goos: solaris
+        goarch: arm
+      - goos: solaris
+        goarch: arm64
+      - goos: freebsd
+        goarch: arm64
+      - goos: netbsd
+        goarch: arm64
+      - goos: openbsd
+        goarch: arm
+      - goos: openbsd
+        goarch: arm64
     ldflags:
       - -s -w
       - -X 'gotty/version.version={{.Version}}'
