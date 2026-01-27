@@ -1,302 +1,306 @@
-// [string] Address to listen, all addresses will be used when empty
+// GoTTY 配置文件
+// 配置项格式: key = value
+// 注释行以 // 开头
+
+// [string] 监听地址，留空时监听所有地址
 // address = ""
 
-// [string] Port to listen
+// [string] 监听端口
 // port = "8080"
 
-// [bool] Permit clients to write to the TTY
+// [bool] 允许客户端写入到终端（允许输入命令）
 // permit_write = false
 
-// [bool] Enable basic authentication
+// [bool] 启用基本认证
 // enable_basic_auth = false
 
-// [string] Default username and password of basic authentication (user:pass)
-//          To enable basic authentication, set `true` to `enable_basic_auth`
+// [string] 基本认证的用户名和密码 (格式: user:pass)
+//          要启用基本认证，需将 enable_basic_auth 设置为 true
 // credential = "user:pass"
 
-// [bool] Enable random URL generation
+// [bool] 启用随机URL生成
 // enable_random_url = false
 
-// [int] Default length of random strings appended to URL
-//       To enable random URL generation, set `true` to `enable_random_url`
+// [int] 追加到URL的随机字符串默认长度
+//       要启用随机URL生成，需将 enable_random_url 设置为 true
 // random_url_length = 8
 
-// [bool] Enable TLS/SSL
+// [bool] 启用 TLS/SSL
 // enable_tls = false
 
-// [string] Default TLS certificate file path
+// [string] 默认TLS证书文件路径
 // tls_crt_file = "~/.gotty.crt"
 
-// [string] Default TLS key file path
+// [string] 默认TLS密钥文件路径
 // tls_key_file = "~/.gotty.key"
 
-// [bool] Enable client certificate authentication
+// [bool] 启用客户端证书认证
 // enable_tls_client_auth = false
 
-// [string] Certificate file of CA for client certificates
+// [string] 用于客户端证书的CA证书文件
 // tls_ca_crt_file = "~/.gotty.ca.crt"
 
-// [string] Custom index.html file
+// [string] 自定义 index.html 文件路径
 // index_file = ""
 
-// [string] Title format of browser window
-//          Available variables are:
-//            Command    Command string
-//            Pid        PID of the process for the client
-//            Hostname   Server hostname
-//            RemoteAddr Client IP address
+// [string] 浏览器窗口标题格式
+//          可用变量：
+//            Command    命令字符串
+//            Pid        客户端进程的PID
+//            Hostname   服务器主机名
+//            RemoteAddr 客户端IP地址
 // title_format = "GoTTY - {{ .Command }} ({{ .Hostname }})"
 
-// [bool] Enable client side reconnection when connection closed
+// [bool] 启用客户端自动重连（连接关闭时）
 // enable_reconnect = false
 
-// [int] Interval time to try reconnection (seconds)
-//       To enable reconnection, set `true` to `enable_reconnect`
+// [int] 尝试重连的间隔时间（秒）
+//       要启用重连，需将 enable_reconnect 设置为 true
 // reconnect_time = 10
 
-// [int] Timeout seconds for waiting a client (0 to disable)
+// [int] 等待客户端连接的超时时间（秒），0表示禁用
 // timeout = 60
 
-// [int] Maximum connection to gotty, 0(default) means no limit.
+// [int] GoTTY的最大连接数，0（默认）表示无限制
 // max_connection = 0
 
-// [bool] Accept only one client and exit gotty once the client exits
+// [bool] 只接受一个客户端，客户端退出后GoTTY也退出
 // once = false
 
-// [bool] Permit clients to send command line arguments in URL (e.g. http://example.com:8080/?arg=AAA&arg=BBB)
+// [bool] 允许客户端在URL中传递命令行参数（例如: http://example.com:8080/?arg=AAA&arg=BBB）
 // permit_arguments = false
 
-// [object] Client terminal (hterm) preferences
+// [object] 客户端终端（hterm）偏好设置
 // preferences {
 
-  // [enum(null, "none", "ctrl-alt", "left-alt", "right-alt")]
-  //     Select an AltGr detection hack^Wheuristic.
-  //       null: Autodetect based on navigator.language: "en-us" => "none", else => "right-alt"
-  //       "none": Disable any AltGr related munging.
-  //       "ctrl-alt": Assume Ctrl+Alt means AltGr.
-  //       "left-alt": Assume left Alt means AltGr.
-  //       "right-alt": Assume right Alt means AltGr.
-  // alt_gr_mode = null
+// [enum(null, "none", "ctrl-alt", "left-alt", "right-alt")]
+//     选择AltGr检测启发式方法
+//       null: 根据navigator.language自动检测: "en-us" => "none", 其他 => "right-alt"
+//       "none": 禁用所有AltGr相关处理
+//       "ctrl-alt": 假定Ctrl+Alt表示AltGr
+//       "left-alt": 假定左Alt表示AltGr
+//       "right-alt": 假定右Alt表示AltGr
+// alt_gr_mode = null
 
-  // [bool] If set, alt-backspace indeed is alt-backspace.
-  // alt_backspace_is_meta_backspace = false
+// [bool] 如果设置，alt-backspace确实是alt-backspace
+// alt_backspace_is_meta_backspace = false
 
-  // [bool] Set whether the alt key acts as a meta key or as a distinct alt key.
-  // alt_is_meta = false
+// [bool] 设置alt键是作为meta键还是作为独立的alt键
+// alt_is_meta = false
 
-  // [enum("escape", "8-bit", "browser-key")]
-  //     Controls how the alt key is handled.
-  //       "escape"....... Send an ESC prefix.
-  //       "8-bit"........ Add 128 to the unshifted character as in xterm.
-  //       "browser-key".. Wait for the keypress event and see what the browser says.
-  //                       (This won't work well on platforms where the browser performs a default action for some alt sequences.)
-  // alt_sends_what = "escape"
+// [enum("escape", "8-bit", "browser-key")]
+//     控制alt键的处理方式
+//       "escape"....... 发送ESC前缀
+//       "8-bit"........ 向未移位字符添加128（如xterm）
+//       "browser-key".. 等待keypress事件，查看浏览器的响应
+//                       （在某些平台上，浏览器对某些alt序列执行默认操作时，此方法效果不佳）
+// alt_sends_what = "escape"
 
-  // [string] URL of the terminal bell sound.  Empty string for no audible bell.
-  // audible_bell_sound = "lib-resource:hterm/audio/bell"
+// [string] 终端铃声URL，空字符串表示无声铃声
+// audible_bell_sound = "lib-resource:hterm/audio/bell"
 
-  // [bool] If true, terminal bells in the background will create a Web Notification. http://www.w3.org/TR/notifications/
-  //        Displaying notifications requires permission from the user.
-  //        When this option is set to true, hterm will attempt to ask the user for permission if necessary.
-  //        Note browsers may not show this permission request
-  //        if it did not originate from a user action.
-  // desktop_notification_bell = false
+// [bool] 如果为true，后台终端铃声将创建Web通知 http://www.w3.org/TR/notifications/
+//        显示通知需要用户权限
+//        当此选项设置为true时，hterm将在必要时尝试请求用户权限
+//        注意：如果权限请求不是源自用户操作，浏览器可能不显示此权限请求
+// desktop_notification_bell = false
 
-  // [string] The background color for text with no other color attributes.
-  // background_color = "rgb(16, 16, 16)"
+// [string] 没有其他颜色属性的文本背景色
+// background_color = "rgb(16, 16, 16)"
 
-  // [string] CSS value of the background image.  Empty string for no image.
-  //          For example:
-  //            "url(https://goo.gl/anedTK) linear-gradient(top bottom, blue, red)"
-  // background_image = ""
+// [string] 背景图片的CSS值，空字符串表示无图片
+//          例如：
+//            "url(https://goo.gl/anedTK) linear-gradient(top bottom, blue, red)"
+// background_image = ""
 
-  // [string] CSS value of the background image size.  Defaults to none.
-  // background_size = ""
+// [string] 背景图片大小的CSS值，默认为none
+// background_size = ""
 
-  // [string] CSS value of the background image position.
-  //          For example:
-  //           "10% 10% center"
-  // background_position = ""
+// [string] 背景图片位置的CSS值
+//          例如：
+//           "10% 10% center"
+// background_position = ""
 
-  // [bool] If true, the backspace should send BS ('\x08', aka ^H).  Otherwise the backspace key should send '\x7f'.
-  // backspace_sends_backspace = false
+// [bool] 如果为true，退格键应发送BS（'\x08'，即^H），否则退格键应发送'\x7f'
+// backspace_sends_backspace = false
 
-  // [map[string]map[string]string]
-  //     A nested map where each property is the character set code and the value is a map that is a sparse array itself.
-  //     In that sparse array, each property is the received character and the value is the displayed character.
-  //     For example:
-  //       {"0" = {"+" = "\u2192"
-  //               "," = "\u2190"
-  //               "-" = "\u2191"
-  //               "." = "\u2193"
-  //               "0" = "\u2588"}}
-  // character_map_overrides = null
+// [map[string]map[string]string]
+//     嵌套映射，每个属性是字符集代码，值是稀疏数组
+//     在该稀疏数组中，每个属性是接收的字符，值是显示的字符
+//     例如：
+//       {"0" = {"+" = "\u2192"
+//               "," = "\u2190"
+//               "-" = "\u2191"
+//               "." = "\u2193"
+//               "0" = "\u2588"}}
+// character_map_overrides = null
 
-  // [bool] Whether or not to close the window when the command exits.
-  // close_on_exit = true
+// [bool] 命令退出时是否关闭窗口
+// close_on_exit = true
 
-  // [bool] Whether or not to blink the cursor by default.
-  // cursor_blink = false
+// [bool] 默认是否闪烁光标
+// cursor_blink = false
 
-  // [2[int]] The cursor blink rate in milliseconds.
-  //          A two element array, the first of which is how long the cursor should be on, second is how long it should be off.
-  // cursor_blink_cycle = [1000, 500]
+// [2[int]] 光标闪烁速率（毫秒）
+//          两元素数组，第一个是光标显示时间，第二个是光标隐藏时间
+// cursor_blink_cycle = [1000, 500]
 
-  // [string] The color of the visible cursor.
-  // cursor_color = "rgba(255, 0, 0, 0.5)"
+// [string] 可见光标的颜色
+// cursor_color = "rgba(255, 0, 0, 0.5)"
 
-  // [[]string]
-  //     Override colors in the default palette.
-  //     This can be specified as an array or an object.
-  //     Values can be specified as almost any css color value.
-  //     This includes #RGB, #RRGGBB, rgb(...), rgba(...), and any color names that are also part of the stock X11 rgb.txt file.
-  //     You can use 'null' to specify that the default value should be not be changed.
-  //     This is useful for skipping a small number of indicies when the value is specified as an array.
-  // color_palette_overrides = null
+// [[]string]
+//     覆盖默认调色板中的颜色
+//     可以指定为数组或对象
+//     值可以指定为几乎任何css颜色值
+//     包括 #RGB、#RRGGBB、rgb(...)、rgba(...) 和X11 rgb.txt文件中的任何颜色名称
+//     可以使用'null'指定不应更改默认值
+//     当值指定为数组时，这对于跳过少量索引很有用
+// color_palette_overrides = null
 
-  // [bool] Automatically copy mouse selection to the clipboard.
-  // copy_on_select = true
+// [bool] 自动复制鼠标选择内容到剪贴板
+// copy_on_select = true
 
-  // [bool] Whether to use the default window copy behaviour
-  // use_default_window_copy = false
+// [bool] 是否使用默认的窗口复制行为
+// use_default_window_copy = false
 
-  // [bool] Whether to clear the selection after copying.
-  // clear_selection_after_copy = true
+// [bool] 复制后是否清除选择
+// clear_selection_after_copy = true
 
-  // [bool] If true, Ctrl-Plus/Minus/Zero controls zoom.
-  //        If false, Ctrl-Shift-Plus/Minus/Zero controls zoom, Ctrl-Minus sends ^_, Ctrl-Plus/Zero do nothing.
-  // ctrl_plus_minus_zero_zoom = true
+// [bool] 如果为true，Ctrl-Plus/Minus/Zero控制缩放
+//        如果为false，Ctrl-Shift-Plus/Minus/Zero控制缩放，Ctrl-Minus发送^_，Ctrl-Plus/Zero不执行任何操作
+// ctrl_plus_minus_zero_zoom = true
 
-  // [bool] Ctrl+C copies if true, send ^C to host if false.
-  //        Ctrl+Shift+C sends ^C to host if true, copies if false.
-  // ctrl_c_copy = false
+// [bool] 如果为true，Ctrl+C复制；如果为false，向主机发送^C
+//        如果为true，Ctrl+Shift+C向主机发送^C；如果为false，复制
+// ctrl_c_copy = false
 
-  // [bool] Ctrl+V pastes if true, send ^V to host if false.
-  //        Ctrl+Shift+V sends ^V to host if true, pastes if false.
-  // ctrl_v_paste = false
+// [bool] 如果为true，Ctrl+V粘贴；如果为false，向主机发送^V
+//        如果为true，Ctrl+Shift+V向主机发送^V；如果为false，粘贴
+// ctrl_v_paste = false
 
-  // [bool] Set whether East Asian Ambiguous characters have two column width.
-  // east_asian_ambiguous_as_two_column = false
+// [bool] 设置东亚模糊字符是否具有两列宽度
+// east_asian_ambiguous_as_two_column = false
 
-  // [bool] True to enable 8-bit control characters, false to ignore them.
-  //        We'll respect the two-byte versions of these control characters regardless of this setting.
-  // enable_8_bit_control = false
+// [bool] 为true时启用8位控制字符，为false时忽略它们
+//        无论此设置如何，我们都会遵守这些控制字符的双字节版本
+// enable_8_bit_control = false
 
-  // [enum(null, true, false)]
-  //     True if we should use bold weight font for text with the bold/bright attribute.
-  //     False to use the normal weight font.
-  //     Null to autodetect.
-  // enable_bold = null
+// [enum(null, true, false)]
+//     如果为true，对于具有粗体/亮度属性的文本使用粗体字体
+//     如果为false，使用正常字体
+//     如果为null，自动检测
+// enable_bold = null
 
-  // [bool] True if we should use bright colors (8-15 on a 16 color palette) for any text with the bold attribute.
-  //        False otherwise.
-  // enable_bold_as_bright = true
+// [bool] 如果为true，对于具有粗体属性的任何文本使用亮色（16色调色板上的8-15）
+//        否则为false
+// enable_bold_as_bright = true
 
-  // [bool] Show a message in the terminal when the host writes to the clipboard.
-  // enable_clipboard_notice = true
+// [bool] 当主机写入剪贴板时在终端中显示消息
+// enable_clipboard_notice = true
 
-  // [bool] Allow the host to write directly to the system clipboard.
-  // enable_clipboard_write = true
+// [bool] 允许主机直接写入系统剪贴板
+// enable_clipboard_write = true
 
-  // [bool] Respect the host's attempt to change the cursor blink status using DEC Private Mode 12.
-  // enable_dec12 = false
+// [bool] 使用DEC私有模式12尊重主机尝试更改光标闪烁状态
+// enable_dec12 = false
 
-  // [map[string]string] The default environment variables, as an object.
-  // environment = {"TERM" = "xterm-256color"}
+// [map[string]string] 默认环境变量（对象形式）
+// environment = {"TERM" = "xterm-256color"}
 
-  // [string] Default font family for the terminal text.
-  // font_family = "'DejaVu Sans Mono', 'Everson Mono', FreeMono, 'Menlo', 'Terminal', monospace"
+// [string] 终端文本的默认字体系列
+// font_family = "'DejaVu Sans Mono', 'Everson Mono', FreeMono, 'Menlo', 'Terminal', monospace"
 
-  // [int] The default font size in pixels.
-  // font_size = 15
+// [int] 默认字体大小（像素）
+// font_size = 15
 
-  // [string] CSS font-smoothing property.
-  // font_smoothing = "antialiased"
+// [string] CSS字体平滑属性
+// font_smoothing = "antialiased"
 
-  // [string] The foreground color for text with no other color attributes.
-  // foreground_color = "rgb(240, 240, 240)"
+// [string] 没有其他颜色属性的文本前景色
+// foreground_color = "rgb(240, 240, 240)"
 
-  // [bool] If true, home/end will control the terminal scrollbar and shift home/end will send the VT keycodes.
-  //        If false then home/end sends VT codes and shift home/end scrolls.
-  // home_keys_scroll = false
+// [bool] 如果为true，home/end控制终端滚动条，shift+home/end发送VT键码
+//        如果为false，home/end发送VT码，shift+home/end滚动
+// home_keys_scroll = false
 
-  // [map[string]string]
-  //     A map of key sequence to key actions.
-  //     Key sequences include zero or more modifier keys followed by a key code.
-  //     Key codes can be decimal or hexadecimal numbers, or a key identifier.
-  //     Key actions can be specified a string to send to the host, or an action identifier.
-  //     For a full list of key code and action identifiers, see https://goo.gl/8AoD09.
-  //     Sample keybindings:
-  //       {"Ctrl-Alt-K" = "clearScrollback"
-  //        "Ctrl-Shift-L"= "PASS"
-  //        "Ctrl-H" = "'HELLO\n'"}
-  // keybindings = null
+// [map[string]string]
+//     按键序列到按键动作的映射
+//     按键序列包括零个或多个修饰键后跟一个键码
+//     键码可以是十进制或十六进制数字，或键标识符
+//     按键动作可以指定为发送到主机的字符串，或动作标识符
+//     有关键码和动作标识符的完整列表，请参阅 https://goo.gl/8AoD09
+//     示例键绑定：
+//       {"Ctrl-Alt-K" = "clearScrollback"
+//        "Ctrl-Shift-L"= "PASS"
+//        "Ctrl-H" = "'HELLO\n'"}
+// keybindings = null
 
-  // [int] Max length of a DCS, OSC, PM, or APS sequence before we give up and ignore the code.
-  // max_string_sequence = 100000
+// [int] DCS、OSC、PM或APS序列的最大长度，超过此长度我们将放弃并忽略代码
+// max_string_sequence = 100000
 
-  // [bool] If true, convert media keys to their Fkey equivalent.
-  //        If false, let the browser handle the keys.
-  // media_keys_are_fkeys = false
+// [bool] 如果为true，将媒体键转换为其Fkey等效项
+//        如果为false，让浏览器处理这些键
+// media_keys_are_fkeys = false
 
-  // [bool] Set whether the meta key sends a leading escape or not.
-  // meta_sends_escape = true
+// [bool] 设置meta键是否发送前导转义符
+// meta_sends_escape = true
 
-  // [enum(null, 0, 1, 2, 3, 4, 5, 6]
-  //     Mouse paste button, or null to autodetect.
-  //     For autodetect, we'll try to enable middle button paste for non-X11 platforms.
-  //     On X11 we move it to button 3.
-  // mouse_paste_button = null
+// [enum(null, 0, 1, 2, 3, 4, 5, 6]
+//     鼠标粘贴按钮，或null表示自动检测
+//     对于自动检测，我们将尝试为非X11平台启用中键粘贴
+//     在X11上，我们将其移至按钮3
+// mouse_paste_button = null
 
-  // [bool] If true, page up/down will control the terminal scrollbar and shift page up/down will send the VT keycodes.
-  //        If false then page up/down sends VT codes and shift page up/down scrolls.
-  // page_keys_scroll = false
+// [bool] 如果为true，page up/down控制终端滚动条，shift+page up/down发送VT键码
+//        如果为false，page up/down发送VT码，shift+page up/down滚动
+// page_keys_scroll = false
 
-  // [enum(null, true, false)]
-  //     Set whether we should pass Alt-1..9 to the browser.
-  //     This is handy when running hterm in a browser tab, so that you don't lose Chrome's "switch to tab" keyboard accelerators.
-  //     When not running in a tab it's better to send these keys to the host so they can be used in vim or emacs.
-  //     If true, Alt-1..9 will be handled by the browser.
-  //     If false, Alt-1..9 will be sent to the host.
-  //     If null, autodetect based on browser platform and window type.
-  // pass_alt_number = null
+// [enum(null, true, false)]
+//     设置是否应将Alt-1..9传递给浏览器
+//     在浏览器标签中运行hterm时很方便，这样您就不会失去Chrome的"切换到标签"键盘快捷键
+//     不在标签中运行时，最好将这些键发送到主机，以便在vim或emacs中使用
+//     如果为true，Alt-1..9将由浏览器处理
+//     如果为false，Alt-1..9将发送到主机
+//     如果为null，根据浏览器平台和窗口类型自动检测
+// pass_alt_number = null
 
-  // [enum(null, true, false)]
-  //     Set whether we should pass Ctrl-1..9 to the browser.
-  //     This is handy when running hterm in a browser tab, so that you don't lose Chrome's "switch to tab" keyboard accelerators.
-  //     When not running in a tab it's better to send these keys to the host so they can be used in vim or emacs.
-  //     If true, Ctrl-1..9 will be handled by the browser.
-  //     If false, Ctrl-1..9 will be sent to the host.
-  //     If null, autodetect based on browser platform and window type.
-  // pass_ctrl_number = null
+// [enum(null, true, false)]
+//     设置是否应将Ctrl-1..9传递给浏览器
+//     在浏览器标签中运行hterm时很方便，这样您就不会失去Chrome的"切换到标签"键盘快捷键
+//     不在标签中运行时，最好将这些键发送到主机，以便在vim或emacs中使用
+//     如果为true，Ctrl-1..9将由浏览器处理
+//     如果为false，Ctrl-1..9将发送到主机
+//     如果为null，根据浏览器平台和窗口类型自动检测
+// pass_ctrl_number = null
 
-  // [enum(null, true, false)]
-  //     Set whether we should pass Meta-1..9 to the browser.
-  //     This is handy when running hterm in a browser tab, so that you don't lose Chrome's "switch to tab" keyboard accelerators.
-  //     When not running in a tab it's better to send these keys to the host so they can be used in vim or emacs.
-  //     If true, Meta-1..9 will be handled by the browser.
-  //     If false, Meta-1..9 will be sent to the host.  If null, autodetect based on browser platform and window type.
-  // pass_meta_number = null
+// [enum(null, true, false)]
+//     设置是否应将Meta-1..9传递给浏览器
+//     在浏览器标签中运行hterm时很方便，这样您就不会失去Chrome的"切换到标签"键盘快捷键
+//     不在标签中运行时，最好将这些键发送到主机，以便在vim或emacs中使用
+//     如果为true，Meta-1..9将由浏览器处理
+//     如果为false，Meta-1..9将发送到主机
+//     如果为null，根据浏览器平台和窗口类型自动检测
+// pass_meta_number = null
 
-  // [bool] Set whether meta-V gets passed to host.
-  // pass_meta_v = true
+// [bool] 设置meta-V是否传递给主机
+// pass_meta_v = true
 
-  // [bool] If true, scroll to the bottom on any keystroke.
-  // scroll_on_keystroke = true
+// [bool] 如果为true，任何按键时滚动到底部
+// scroll_on_keystroke = true
 
-  // [bool] If true, scroll to the bottom on terminal output.
-  // scroll_on_output = false
+// [bool] 如果为true，终端输出时滚动到底部
+// scroll_on_output = false
 
-  // [bool] The vertical scrollbar mode.
-  // scrollbar_visible = true
+// [bool] 垂直滚动条模式
+// scrollbar_visible = true
 
-  // [int] The multiplier for the pixel delta in mousewheel event caused by the scroll wheel. Alters how fast the page scrolls.
-  // scroll_wheel_move_multiplier = 1
+// [int] 鼠标滚轮事件中像素增量的乘数，改变页面滚动速度
+// scroll_wheel_move_multiplier = 1
 
-  // [bool] Shift + Insert pastes if true, sent to host if false.
-  // shift_insert_paste = true
+// [bool] 如果为true，Shift+Insert粘贴；如果为false，发送到主机
+// shift_insert_paste = true
 
-  // [string] URL of user stylesheet to include in the terminal document.
-  // user_css = ""
+// [string] 要包含在终端文档中的用户样式表URL
+// user_css = ""
 
 // }

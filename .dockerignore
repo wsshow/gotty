@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+.github
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Build artifacts
+release/
+js/node_modules/
+js/dist/
+bindata/
+
+# Documentation
+README.md
+LICENSE
+*.md
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+
+# Test files
+*_test.go
+test/
