@@ -31,6 +31,7 @@
         "mammoth": "^1.11.0",
         "marked": "^11.2.0",
         "papaparse": "^5.5.3",
+        "pdfjs-dist": "^4.0.379",
         "preact": "^10.27.0",
         "react-bootstrap": "^2.10.10",
         "xlsx": "^0.18.5",

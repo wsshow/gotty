@@ -4,6 +4,7 @@ import hljs from 'highlight.js';
 import * as XLSX from 'xlsx';
 import * as mammoth from 'mammoth';
 import * as Papa from 'papaparse';
+import * as pdfjsLib from 'pdfjs-dist';
 
 interface FileInfo {
     name: string;
@@ -88,10 +89,22 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     } | null>(null);
     const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
+    const [pdfState, setPdfState] = useState<{
+        currentPage: number;
+        totalPages: number;
+        pdfDoc: any;
+    } | null>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const folderInputRef = useRef<HTMLInputElement>(null);
     const previewContainerRef = useRef<HTMLDivElement>(null);
+    const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Configure PDF.js worker
+    useEffect(() => {
+        // Use worker from static directory
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.min.js';
+    }, []);
 
     const getAuthHeaders = (): Record<string, string> => {
         const auth = sessionStorage.getItem('gotty_auth');
@@ -603,9 +616,10 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         const htmlTypes = ['html', 'htm'];
         const spreadsheetTypes = ['xlsx', 'xls', 'csv'];
         const docTypes = ['docx'];
+        const pdfTypes = ['pdf'];
 
         // Check if file type is supported for preview
-        const canPreview = imageMimeTypes.includes(ext) || videoMimeTypes.includes(ext) || codeMimeTypes.includes(ext) || textMimeTypes.includes(ext) || markdownTypes.includes(ext) || htmlTypes.includes(ext) || spreadsheetTypes.includes(ext) || docTypes.includes(ext);
+        const canPreview = imageMimeTypes.includes(ext) || videoMimeTypes.includes(ext) || codeMimeTypes.includes(ext) || textMimeTypes.includes(ext) || markdownTypes.includes(ext) || htmlTypes.includes(ext) || spreadsheetTypes.includes(ext) || docTypes.includes(ext) || pdfTypes.includes(ext);
         
         if (!canPreview) {
             // Show custom dialog for unsupported file types
@@ -656,6 +670,21 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 const arrayBuffer = await response.arrayBuffer();
                 const result = await mammoth.convertToHtml({ arrayBuffer });
                 setPreviewFile({ file, content: result.value, type: 'docx' });
+            } else if (ext === 'pdf') {
+                const arrayBuffer = await response.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdfDoc = await loadingTask.promise;
+                // Create blob from arrayBuffer for cleanup
+                const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+                const url = window.URL.createObjectURL(blob);
+                setPreviewFile({ file, content: url, type: 'pdf' });
+                setPdfState({
+                    currentPage: 1,
+                    totalPages: pdfDoc.numPages,
+                    pdfDoc: pdfDoc
+                });
+                // Render first page after state is set
+                setTimeout(() => renderPdfPage(1), 100);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Preview failed');
@@ -671,6 +700,9 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         if (previewFile?.type === 'video' && previewFile.content) {
             window.URL.revokeObjectURL(previewFile.content);
         }
+        if (previewFile?.type === 'pdf' && previewFile.content) {
+            window.URL.revokeObjectURL(previewFile.content);
+        }
         // Exit fullscreen if active
         if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -678,6 +710,52 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         setPreviewFile(null);
         setIsPreviewFullscreen(false);
         setCopySuccess(false);
+        setPdfState(null);
+    };
+
+    const renderPdfPage = async (pageNum: number) => {
+        if (!pdfState?.pdfDoc || !pdfCanvasRef.current) return;
+
+        try {
+            const page = await pdfState.pdfDoc.getPage(pageNum);
+            const canvas = pdfCanvasRef.current;
+            const context = canvas.getContext('2d');
+            
+            if (!context) return;
+
+            // Calculate scale to fit container width
+            const container = canvas.parentElement;
+            const containerWidth = container?.clientWidth || 800;
+            const viewport = page.getViewport({ scale: 1 });
+            const scale = (containerWidth - 40) / viewport.width; // 40px for padding
+            const scaledViewport = page.getViewport({ scale });
+
+            canvas.height = scaledViewport.height;
+            canvas.width = scaledViewport.width;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: scaledViewport
+            };
+
+            await page.render(renderContext).promise;
+            setPdfState(prev => prev ? { ...prev, currentPage: pageNum } : null);
+        } catch (err) {
+            console.error('PDF render error:', err);
+            setError('PDF页面渲染失败');
+        }
+    };
+
+    const handlePdfPageChange = (direction: 'prev' | 'next') => {
+        if (!pdfState) return;
+
+        const newPage = direction === 'prev' 
+            ? Math.max(1, pdfState.currentPage - 1)
+            : Math.min(pdfState.totalPages, pdfState.currentPage + 1);
+
+        if (newPage !== pdfState.currentPage) {
+            renderPdfPage(newPage);
+        }
     };
 
     const handleCopyContent = async () => {
@@ -1012,6 +1090,38 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                 className="docx-preview" 
                                 dangerouslySetInnerHTML={{ __html: previewFile.content }}
                             />
+                        )}
+                        {previewFile.type === 'pdf' && pdfState && (
+                            <div className="pdf-preview-container">
+                                <div className="pdf-controls">
+                                    <button 
+                                        className="pdf-nav-btn"
+                                        onClick={() => handlePdfPageChange('prev')}
+                                        disabled={pdfState.currentPage === 1}
+                                        title="上一页"
+                                    >
+                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                                        </svg>
+                                    </button>
+                                    <span className="pdf-page-info">
+                                        {pdfState.currentPage} / {pdfState.totalPages}
+                                    </span>
+                                    <button 
+                                        className="pdf-nav-btn"
+                                        onClick={() => handlePdfPageChange('next')}
+                                        disabled={pdfState.currentPage === pdfState.totalPages}
+                                        title="下一页"
+                                    >
+                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div className="pdf-canvas-wrapper">
+                                    <canvas ref={pdfCanvasRef} className="pdf-canvas"></canvas>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
