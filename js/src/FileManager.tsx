@@ -996,7 +996,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                     <div className="preview-header">
                         <h3>{previewFile.file.name}</h3>
                         <div className="preview-header-actions">
-                            {(previewFile.type === 'code' || previewFile.type === 'csv') && (
+                            {(previewFile.type === 'code' || previewFile.type === 'csv' || previewFile.type === 'html') && (
                                 <button 
                                     className={`preview-action-btn copy-btn ${copySuccess ? 'copy-success' : ''}`}
                                     onClick={handleCopyContent}
@@ -1044,11 +1044,13 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             />
                         )}
                         {previewFile.type === 'html' && previewFile.content && (
-                            <iframe 
-                                srcDoc={previewFile.content}
-                                className="html-preview"
-                                sandbox="allow-scripts"
-                            />
+                            <div className="html-preview-wrapper">
+                                <iframe 
+                                    srcDoc={previewFile.content}
+                                    className="html-preview"
+                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                                />
+                            </div>
                         )}
                         {previewFile.type === 'code' && previewFile.content && (
                             <pre className="code-preview">
