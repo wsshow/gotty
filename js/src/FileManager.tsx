@@ -1210,12 +1210,14 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             />
                         )}
                         {previewFile.type === 'html' && previewFile.content && (
-                            <div className="html-preview-wrapper">
-                                <iframe 
-                                    srcDoc={previewFile.content}
-                                    className="html-preview"
-                                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                                />
+                            <div className="html-preview-stage">
+                                <div className="html-preview-wrapper">
+                                    <iframe 
+                                        srcDoc={previewFile.content}
+                                        className="html-preview"
+                                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                                    />
+                                </div>
                             </div>
                         )}
                         {previewFile.type === 'code' && previewFile.content && (

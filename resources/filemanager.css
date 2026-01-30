@@ -1316,10 +1316,17 @@ input[type="checkbox"] {
 }
 
 /* HTML预览容器 - 使用缩放显示完整页面 */
+.html-preview-stage {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0;
+}
+
 .html-preview-wrapper {
     width: 800px;
     height: 500px;
-    margin: 0 auto;
     overflow: hidden;
     border-radius: 6px;
     background: #ffffff;
