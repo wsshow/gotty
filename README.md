@@ -212,6 +212,7 @@ credential = "username:password"
 - CSV：表格形式展示，支持复制原始内容
 - Excel (xlsx/xls)：表格形式展示第一个工作表
 - Word (docx)：转换为HTML展示，保留格式
+- PDF：使用PDF.js渲染，支持页面导航
 
 **其他格式**
 - TXT, LOG等文本文件：纯文本预览
@@ -314,6 +315,7 @@ make
 - **xlsx** - Excel文件解析
 - **mammoth** - Word文档解析
 - **papaparse** - CSV文件解析
+- **pdfjs-dist** - PDF文件渲染
 
 ### 后端开发
 
@@ -344,7 +346,8 @@ go vet ./...
 - **代码高亮** - 30+种编程语言语法高亮（GitHub Dark主题）
 - **图片预览** - 支持JPG/PNG/GIF/SVG/WebP等格式
 - **视频播放** - 支持MP4/WebM/OGG等格式在线播放
-- **文档预览** - 支持Markdown/HTML/CSV/Excel/Word
+- **文档预览** - 支持Markdown/HTML/CSV/Excel/Word/PDF
+- **PDF预览** - 使用PDF.js渲染，支持页面导航（上一页/下一页）
 - **一键复制** - 代码和CSV内容快速复制到剪贴板
 - **全屏模式** - 所有预览都支持全屏查看
 

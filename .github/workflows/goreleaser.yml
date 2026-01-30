@@ -45,6 +45,7 @@ jobs:
           cp resources/filemanager.css bindata/static/css/
           cp resources/login.css bindata/static/css/
           cp js/node_modules/@xterm/xterm/css/xterm.css bindata/static/css/
+          cp js/node_modules/pdfjs-dist/build/pdf.worker.min.mjs bindata/static/js/pdf.worker.min.js
 
       - name: Set up Go
         uses: actions/setup-go@v6

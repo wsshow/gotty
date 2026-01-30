@@ -49,6 +49,7 @@ build:
 .PHONY: assets
 assets: bindata/static/js/gotty.js.map \
 	bindata/static/js/gotty.js \
+	bindata/static/js/pdf.worker.min.js \
 	bindata/static/index.html \
 	bindata/static/icon.svg \
 	bindata/static/favicon.ico \
