@@ -3,3 +3,4 @@ builds
 js/dist
 js/node_modules/*
 release/
+bindata/static/

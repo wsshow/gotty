@@ -73,7 +73,13 @@ bindata/static/css/%.css: resources/%.css | bindata/static
 bindata/static/css/xterm.css: js/node_modules/@xterm/xterm/css/xterm.css | bindata/static
 	cp "$<" "$@"
 
+bindata/static/js/pdf.worker.min.js: js/node_modules/pdfjs-dist/build/pdf.worker.min.mjs | bindata/static/js
+	cp "$<" "$@"
+
 js/node_modules/@xterm/xterm/css/xterm.css:
+	cd js && npm install
+
+js/node_modules/pdfjs-dist/build/pdf.worker.min.mjs:
 	cd js && npm install
 
 bindata/static/js/gotty.js.map bindata/static/js/gotty.js: js/src/* | js/node_modules/webpack

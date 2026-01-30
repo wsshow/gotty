@@ -24,34 +24,14 @@ jobs:
           cache: "npm"
           cache-dependency-path: js/package-lock.json
 
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: js
-
-      - name: Build frontend assets
-        run: npx webpack --mode=production
-        working-directory: js
-
-      - name: Prepare bindata static files
-        run: |
-          mkdir -p bindata/static/css bindata/static/js
-          cp resources/index.html bindata/static/
-          cp resources/icon.svg bindata/static/ 2>/dev/null || true
-          cp resources/favicon.ico bindata/static/ 2>/dev/null || true
-          cp resources/manifest.json bindata/static/
-          cp resources/icon_192.png bindata/static/ 2>/dev/null || true
-          cp resources/index.css bindata/static/css/
-          cp resources/xterm_customize.css bindata/static/css/
-          cp resources/filemanager.css bindata/static/css/
-          cp resources/login.css bindata/static/css/
-          cp js/node_modules/@xterm/xterm/css/xterm.css bindata/static/css/
-          cp js/node_modules/pdfjs-dist/build/pdf.worker.min.mjs bindata/static/js/pdf.worker.min.js
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: "go.mod"
           cache: true
+
+      - name: Build all assets
+        run: make assets
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
