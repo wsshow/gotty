@@ -90,15 +90,21 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
     const [pdfState, setPdfState] = useState<{
-        currentPage: number;
         totalPages: number;
         pdfDoc: any;
+        thumbnails: Array<string | null>;
+        renderedPages: number;
+        viewMode: 'grid' | 'single';
+        currentPage: number | null;
+        fullPageUrl: string | null;
     } | null>(null);
+    const [pdfThumbLoading, setPdfThumbLoading] = useState(false);
+    const [pdfPageLoading, setPdfPageLoading] = useState(false);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const folderInputRef = useRef<HTMLInputElement>(null);
     const previewContainerRef = useRef<HTMLDivElement>(null);
-    const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
+    const pdfGridRef = useRef<HTMLDivElement>(null);
 
     // Configure PDF.js worker
     useEffect(() => {
@@ -678,13 +684,8 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
                 const url = window.URL.createObjectURL(blob);
                 setPreviewFile({ file, content: url, type: 'pdf' });
-                setPdfState({
-                    currentPage: 1,
-                    totalPages: pdfDoc.numPages,
-                    pdfDoc: pdfDoc
-                });
-                // Render first page after state is set
-                setTimeout(() => renderPdfPage(1), 100);
+                // Render thumbnails with lazy loading
+                await initPdfThumbnails(pdfDoc);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Preview failed');
@@ -713,49 +714,214 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         setPdfState(null);
     };
 
-    const renderPdfPage = async (pageNum: number) => {
-        if (!pdfState?.pdfDoc || !pdfCanvasRef.current) return;
-
+    const renderPdfThumbnailBatch = async (pdfDoc: any, startPage: number, batchSize = 1) => {
         try {
-            const page = await pdfState.pdfDoc.getPage(pageNum);
-            const canvas = pdfCanvasRef.current;
-            const context = canvas.getContext('2d');
-            
-            if (!context) return;
+            setPdfThumbLoading(true);
+            const totalPages = pdfDoc.numPages;
+            const endPage = Math.min(startPage + batchSize - 1, totalPages);
+            const batchThumbnails: Array<{ page: number; url: string }> = [];
 
-            // Calculate scale to fit container width
-            const container = canvas.parentElement;
-            const containerWidth = container?.clientWidth || 800;
-            const viewport = page.getViewport({ scale: 1 });
-            const scale = (containerWidth - 40) / viewport.width; // 40px for padding
-            const scaledViewport = page.getViewport({ scale });
+            for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+                const page = await pdfDoc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 0.4 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
 
-            canvas.height = scaledViewport.height;
-            canvas.width = scaledViewport.width;
+                if (!context) continue;
 
-            const renderContext = {
-                canvasContext: context,
-                viewport: scaledViewport
-            };
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
 
-            await page.render(renderContext).promise;
-            setPdfState(prev => prev ? { ...prev, currentPage: pageNum } : null);
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+
+                await page.render(renderContext).promise;
+                const thumbnailUrl = canvas.toDataURL('image/png');
+                batchThumbnails.push({ page: pageNum, url: thumbnailUrl });
+            }
+
+            setPdfState(prev => {
+                if (!prev) return prev;
+                const updated = [...prev.thumbnails];
+                batchThumbnails.forEach(item => {
+                    updated[item.page - 1] = item.url;
+                });
+                return {
+                    ...prev,
+                    thumbnails: updated,
+                    renderedPages: Math.max(prev.renderedPages, endPage)
+                };
+            });
         } catch (err) {
-            console.error('PDF render error:', err);
-            setError('PDF页面渲染失败');
+            console.error('PDF thumbnail render error:', err);
+            setError('PDF缩略图生成失败');
+        } finally {
+            setPdfThumbLoading(false);
         }
     };
 
-    const handlePdfPageChange = (direction: 'prev' | 'next') => {
-        if (!pdfState) return;
-
-        const newPage = direction === 'prev' 
-            ? Math.max(1, pdfState.currentPage - 1)
-            : Math.min(pdfState.totalPages, pdfState.currentPage + 1);
-
-        if (newPage !== pdfState.currentPage) {
-            renderPdfPage(newPage);
+    const getPdfGridMetrics = () => {
+        const grid = pdfGridRef.current;
+        if (!grid) {
+            return { batchSize: 12, rowHeight: 300 };
         }
+
+        const firstItem = grid.querySelector('.pdf-thumbnail') as HTMLElement | null;
+        if (!firstItem) {
+            return { batchSize: 12, rowHeight: 300 };
+        }
+
+        const gridStyles = window.getComputedStyle(grid);
+        const columnGap = parseFloat(gridStyles.columnGap || gridStyles.gap || '0');
+        const rowGap = parseFloat(gridStyles.rowGap || gridStyles.gap || '0');
+
+        const itemRect = firstItem.getBoundingClientRect();
+        const itemWidth = itemRect.width;
+        const itemHeight = itemRect.height;
+
+        if (!itemWidth || !itemHeight) {
+            return { batchSize: 12, rowHeight: 300 };
+        }
+
+        const columns = Math.max(1, Math.floor((grid.clientWidth + columnGap) / (itemWidth + columnGap)));
+        const visibleRows = Math.max(1, Math.ceil((grid.clientHeight + rowGap) / (itemHeight + rowGap)));
+        const rowsToLoad = visibleRows + 1;
+
+        return {
+            batchSize: columns * rowsToLoad,
+            rowHeight: itemHeight + rowGap
+        };
+    };
+
+    const initPdfThumbnails = async (pdfDoc: any) => {
+        const totalPages = pdfDoc.numPages;
+        setPdfState({
+            totalPages: totalPages,
+            pdfDoc: pdfDoc,
+            thumbnails: Array(totalPages).fill(null),
+            renderedPages: 0,
+            viewMode: 'grid',
+            currentPage: null,
+            fullPageUrl: null
+        });
+    };
+
+    const loadMorePdfThumbnails = async () => {
+        if (!pdfState || pdfThumbLoading) return;
+        if (pdfState.renderedPages >= pdfState.totalPages) return;
+        
+        // Find the first missing page
+        const nextIndex = pdfState.thumbnails.findIndex((item) => item === null);
+        if (nextIndex === -1) return;
+        
+        const { batchSize } = getPdfGridMetrics();
+        await renderPdfThumbnailBatch(pdfState.pdfDoc, nextIndex + 1, batchSize);
+    };
+
+    useEffect(() => {
+        if (!pdfState || pdfState.viewMode !== 'grid') return;
+        if (pdfThumbLoading) return;
+        if (pdfState.renderedPages > 0) return;
+        if (!pdfState.pdfDoc) return;
+
+        loadMorePdfThumbnails();
+    }, [pdfState?.pdfDoc, pdfState?.viewMode, pdfState?.renderedPages, pdfThumbLoading]);
+
+    useEffect(() => {
+        if (!pdfState || pdfState.viewMode !== 'grid') return;
+        
+        // Find the first placeholder to observe (the "frontier" of rendered content)
+        const firstNullIndex = pdfState.thumbnails.findIndex(t => t === null);
+        if (firstNullIndex === -1) return;
+
+        const targetId = `pdf-thumb-${firstNullIndex}`;
+        const target = document.getElementById(targetId);
+        const grid = pdfGridRef.current;
+
+        if (!target || !grid) return;
+
+        const { rowHeight } = getPdfGridMetrics();
+        const rootMargin = Number.isFinite(rowHeight) && rowHeight > 0
+            ? `${Math.ceil(rowHeight)}px 0px`
+            : '600px 0px';
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const entry = entries[0];
+                if (entry.isIntersecting) {
+                    loadMorePdfThumbnails();
+                }
+            },
+            {
+                root: grid,
+                rootMargin,
+                threshold: 0
+            }
+        );
+
+        observer.observe(target);
+        return () => observer.disconnect();
+    }, [pdfState?.thumbnails, pdfState?.viewMode, pdfThumbLoading]);
+
+    const renderPdfFullPage = async (pageNum: number) => {
+        if (!pdfState?.pdfDoc) return;
+        try {
+            setPdfPageLoading(true);
+            const page = await pdfState.pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.2 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            if (!context) return;
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+
+            await page.render(renderContext).promise;
+            const pageUrl = canvas.toDataURL('image/png');
+
+            setPdfState(prev => prev ? {
+                ...prev,
+                viewMode: 'single',
+                currentPage: pageNum,
+                fullPageUrl: pageUrl
+            } : prev);
+        } catch (err) {
+            console.error('PDF page render error:', err);
+            setError('PDF页面渲染失败');
+        } finally {
+            setPdfPageLoading(false);
+        }
+    };
+
+    const goToPdfPrevPage = async () => {
+        if (!pdfState?.currentPage) return;
+        const prevPage = Math.max(1, pdfState.currentPage - 1);
+        if (prevPage === pdfState.currentPage) return;
+        await renderPdfFullPage(prevPage);
+    };
+
+    const goToPdfNextPage = async () => {
+        if (!pdfState?.currentPage) return;
+        const nextPage = Math.min(pdfState.totalPages, pdfState.currentPage + 1);
+        if (nextPage === pdfState.currentPage) return;
+        await renderPdfFullPage(nextPage);
+    };
+
+    const backToPdfGrid = () => {
+        setPdfState(prev => prev ? {
+            ...prev,
+            viewMode: 'grid',
+            currentPage: null,
+            fullPageUrl: null
+        } : prev);
     };
 
     const handleCopyContent = async () => {
@@ -1095,34 +1261,73 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         )}
                         {previewFile.type === 'pdf' && pdfState && (
                             <div className="pdf-preview-container">
-                                <div className="pdf-controls">
-                                    <button 
-                                        className="pdf-nav-btn"
-                                        onClick={() => handlePdfPageChange('prev')}
-                                        disabled={pdfState.currentPage === 1}
-                                        title="上一页"
-                                    >
-                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-                                        </svg>
-                                    </button>
-                                    <span className="pdf-page-info">
-                                        {pdfState.currentPage} / {pdfState.totalPages}
-                                    </span>
-                                    <button 
-                                        className="pdf-nav-btn"
-                                        onClick={() => handlePdfPageChange('next')}
-                                        disabled={pdfState.currentPage === pdfState.totalPages}
-                                        title="下一页"
-                                    >
-                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                                <div className="pdf-canvas-wrapper">
-                                    <canvas ref={pdfCanvasRef} className="pdf-canvas"></canvas>
-                                </div>
+                                {pdfState.viewMode === 'grid' && (
+                                    <>
+                                        <div className="pdf-grid" ref={pdfGridRef}>
+                                            {pdfState.thumbnails.map((thumbnail, index) => (
+                                                <button
+                                                    key={index}
+                                                    id={`pdf-thumb-${index}`}
+                                                    className={`pdf-thumbnail ${thumbnail ? 'loaded' : 'loading'}`}
+                                                    onClick={() => thumbnail && renderPdfFullPage(index + 1)}
+                                                    disabled={!thumbnail}
+                                                    title={`第 ${index + 1} 页`}
+                                                >
+                                                    {thumbnail ? (
+                                                        <img
+                                                            src={thumbnail}
+                                                            alt={`Page ${index + 1}`}
+                                                            className="pdf-thumbnail-image"
+                                                        />
+                                                    ) : (
+                                                        <div className="pdf-thumbnail-placeholder">
+                                                            <div className="pdf-thumb-spinner"></div>
+                                                        </div>
+                                                    )}
+                                                    <div className="pdf-thumbnail-label">{index + 1}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {pdfThumbLoading && (
+                                            <div className="pdf-load-more">
+                                                <div className="pdf-load-more-hint">加载中...</div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                {pdfState.viewMode === 'single' && (
+                                    <div className="pdf-single-view">
+                                        <div className="pdf-single-header">
+                                            <button className="pdf-back-btn" onClick={backToPdfGrid}>
+                                                返回缩略图
+                                            </button>
+                                            <div className="pdf-page-info">
+                                                第 {pdfState.currentPage} 页 / 共 {pdfState.totalPages} 页
+                                            </div>
+                                            <div className="pdf-nav-group">
+                                                <button className="pdf-nav-btn" onClick={goToPdfPrevPage} disabled={pdfState.currentPage === 1}>
+                                                    上一页
+                                                </button>
+                                                <button className="pdf-nav-btn" onClick={goToPdfNextPage} disabled={pdfState.currentPage === pdfState.totalPages}>
+                                                    下一页
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="pdf-single-body">
+                                            {pdfPageLoading && (
+                                                <div className="pdf-page-loading">加载中...</div>
+                                            )}
+                                            {pdfState.fullPageUrl && (
+                                                <img
+                                                    src={pdfState.fullPageUrl}
+                                                    alt={`Page ${pdfState.currentPage}`}
+                                                    className="pdf-full-page"
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
