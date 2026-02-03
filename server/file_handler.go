@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -19,6 +21,7 @@ const (
 	chunkSize      = 5 * 1024 * 1024   // 5 MB per chunk
 	uploadPath     = "./uploads"
 	tempUploadPath = "./uploads/.temp"
+	tempCleanupAge = 24 * time.Hour // Clean up temp files older than 24 hours
 )
 
 // handleFileUpload handles file upload requests (supports batch and folder uploads)
@@ -162,6 +165,12 @@ func (server *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 		log.Printf("File uploaded successfully: %s (size: %d bytes)", filePath, size)
 	}
+
+	// Clean up old temp files and check if temp directory is empty
+	go func() {
+		cleanupOldTempFiles()
+		cleanupEmptyTempDir()
+	}()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -308,8 +317,14 @@ func (server *Server) handleChunkUpload(w http.ResponseWriter, r *http.Request) 
 			totalSize += size
 		}
 
-		// Clean up temp directory
+		// Clean up temp directory for this file
 		os.RemoveAll(tempDir)
+
+		// Clean up old temp directories and check if temp directory is empty
+		go func() {
+			cleanupOldTempFiles()
+			cleanupEmptyTempDir()
+		}()
 
 		log.Printf("File uploaded successfully (chunked): %s (size: %d bytes)", finalPath, totalSize)
 
@@ -606,6 +621,28 @@ func (server *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 		files = append(files, fileEntry)
 	}
 
+	// Sort files: folders first, then by time (newest first), then by name
+	sort.Slice(files, func(i, j int) bool {
+		// 1. Folders first
+		iIsDir := files[i]["isDir"].(bool)
+		jIsDir := files[j]["isDir"].(bool)
+		if iIsDir != jIsDir {
+			return iIsDir
+		}
+
+		// 2. Sort by time (newest first)
+		iTime := files[i]["time"].(int64)
+		jTime := files[j]["time"].(int64)
+		if iTime != jTime {
+			return iTime > jTime
+		}
+
+		// 3. Sort by name (ascending)
+		iName := files[i]["name"].(string)
+		jName := files[j]["name"].(string)
+		return iName < jName
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
@@ -678,4 +715,70 @@ func (server *Server) handleFileDelete(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success": true, "message": "File deleted successfully"}`)
+}
+
+// cleanupOldTempFiles removes old temporary upload directories
+func cleanupOldTempFiles() {
+	// Check if temp directory exists
+	if _, err := os.Stat(tempUploadPath); os.IsNotExist(err) {
+		return
+	}
+
+	entries, err := os.ReadDir(tempUploadPath)
+	if err != nil {
+		log.Printf("Failed to read temp directory: %v", err)
+		return
+	}
+
+	now := time.Now()
+	cleanedCount := 0
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		dirPath := filepath.Join(tempUploadPath, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		// Remove directories older than tempCleanupAge
+		if now.Sub(info.ModTime()) > tempCleanupAge {
+			if err := os.RemoveAll(dirPath); err != nil {
+				log.Printf("Failed to remove old temp directory %s: %v", dirPath, err)
+			} else {
+				cleanedCount++
+				log.Printf("Cleaned up old temp directory: %s", entry.Name())
+			}
+		}
+	}
+
+	if cleanedCount > 0 {
+		log.Printf("Cleaned up %d old temp directories", cleanedCount)
+	}
+}
+
+// cleanupEmptyTempDir removes the temp directory if it's empty
+func cleanupEmptyTempDir() {
+	// Check if temp directory exists
+	if _, err := os.Stat(tempUploadPath); os.IsNotExist(err) {
+		return
+	}
+
+	entries, err := os.ReadDir(tempUploadPath)
+	if err != nil {
+		log.Printf("Failed to read temp directory: %v", err)
+		return
+	}
+
+	// If temp directory is empty, remove it
+	if len(entries) == 0 {
+		if err := os.Remove(tempUploadPath); err != nil {
+			log.Printf("Failed to remove empty temp directory: %v", err)
+		} else {
+			log.Printf("Removed empty temp directory: %s", tempUploadPath)
+		}
+	}
 }
