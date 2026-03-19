@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
@@ -134,7 +135,40 @@ func (server *Server) generateHandleWS(ctx context.Context, cancel context.Cance
 	}
 }
 
+const (
+	wsPingInterval = 30 * time.Second
+	wsPingTimeout  = 10 * time.Second
+	wsPongWait     = 60 * time.Second
+)
+
 func (server *Server) processWSConn(ctx context.Context, conn *websocket.Conn, headers map[string][]string) error {
+	// Set up WebSocket protocol-level ping/pong to keep the connection alive
+	// through proxies, load balancers, and firewalls that have idle timeouts.
+	conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(wsPongWait))
+		return nil
+	})
+
+	wrapper := &wsWrapper{Conn: conn}
+
+	pingCtx, pingCancel := context.WithCancel(ctx)
+	defer pingCancel()
+	go func() {
+		ticker := time.NewTicker(wsPingInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := wrapper.WritePing(); err != nil {
+					return
+				}
+			case <-pingCtx.Done():
+				return
+			}
+		}
+	}()
+
 	typ, initLine, err := conn.ReadMessage()
 	if err != nil {
 		return errors.Wrapf(err, "failed to authenticate websocket connection")
@@ -209,7 +243,7 @@ func (server *Server) processWSConn(ctx context.Context, conn *websocket.Conn, h
 	if server.options.Height > 0 {
 		opts = append(opts, webtty.WithFixedRows(server.options.Height))
 	}
-	tty, err := webtty.New(&wsWrapper{conn}, slave, opts...)
+	tty, err := webtty.New(wrapper, slave, opts...)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create webtty")
 	}

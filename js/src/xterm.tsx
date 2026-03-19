@@ -17,8 +17,8 @@ export class GoTTYXterm {
     messageTimeout: number;
     messageTimer: NodeJS.Timeout;
 
-    onResizeHandler: IDisposable;
-    onDataHandler: IDisposable;
+    onResizeHandler: IDisposable | undefined;
+    onDataHandler: IDisposable | undefined;
 
     fitAddOn: FitAddon;
     zmodemAddon: ZModemAddon;
@@ -139,9 +139,11 @@ export class GoTTYXterm {
     deactivate(): void {
         if (this.onDataHandler) {
             this.onDataHandler.dispose();
+            this.onDataHandler = undefined;
         }
         if (this.onResizeHandler) {
             this.onResizeHandler.dispose();
+            this.onResizeHandler = undefined;
         }
         this.term.blur();
     }
