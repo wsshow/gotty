@@ -79,7 +79,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const [confirmDownload, setConfirmDownload] = useState<{ file: FileInfo; show: boolean } | null>(null);
     const [previewFile, setPreviewFile] = useState<{ file: FileInfo; content: string | null; type: string } | null>(null);
     const [downloadProgress, setDownloadProgress] = useState<{ filename: string; progress: number } | null>(null);
-    const [batchDownloadProgress, setBatchDownloadProgress] = useState<{ 
+    const [batchDownloadProgress, setBatchDownloadProgress] = useState<{
         status: 'preparing' | 'downloading' | 'complete';
         fileCount: number;
         downloaded: number;
@@ -100,7 +100,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     } | null>(null);
     const [pdfThumbLoading, setPdfThumbLoading] = useState(false);
     const [pdfPageLoading, setPdfPageLoading] = useState(false);
-    
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const folderInputRef = useRef<HTMLInputElement>(null);
     const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -226,7 +226,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const uploadChunkedFile = async (file: File, relativePath: string) => {
         const fileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-        
+
         setUploadProgress(prev => ({
             ...prev,
             [fileId]: { progress: 0, total: file.size, filename: file.name }
@@ -282,9 +282,9 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 const file = fileList[i];
                 const relativePath = (file as any).webkitRelativePath || file.name;
                 totalBytes += file.size;
-                
+
                 console.log(`Processing file: ${file.name}, webkitRelativePath: ${(file as any).webkitRelativePath}, using: ${relativePath}`);
-                
+
                 if (file.size > LARGE_FILE_SIZE) {
                     largeFiles.push({ file, path: relativePath });
                 } else {
@@ -312,23 +312,23 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             if (normalFiles.length > 0) {
                 const formData = new FormData();
                 formData.append('path', currentPath);
-                
+
                 // Show upload progress
                 const uploadId = `batch_${Date.now()}`;
                 let totalSize = 0;
-                
+
                 // Build arrays for files and their paths
                 const filePaths: string[] = [];
-                
+
                 for (const { file, path } of normalFiles) {
                     totalSize += file.size;
                     formData.append('files', file);
                     filePaths.push(path);
                 }
-                
+
                 // Send paths as a JSON string
                 formData.append('filePaths', JSON.stringify(filePaths));
-                
+
                 // Update stats with current batch info
                 setBatchUploadStats(prev => prev ? {
                     ...prev,
@@ -344,7 +344,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 await new Promise((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
                     const batchStartTime = Date.now();
-                    
+
                     xhr.upload.addEventListener('progress', (e) => {
                         if (e.lengthComputable) {
                             const elapsed = (Date.now() - batchStartTime) / 1000;
@@ -364,7 +364,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             }));
                         }
                     });
-                    
+
                     xhr.addEventListener('load', () => {
                         if (xhr.status >= 200 && xhr.status < 300) {
                             resolve(xhr.response);
@@ -372,20 +372,20 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             reject(new Error('Batch upload failed'));
                         }
                     });
-                    
+
                     xhr.addEventListener('error', () => reject(new Error('Batch upload failed')));
-                    
+
                     xhr.open('POST', 'api/upload');
-                    
+
                     // Add auth headers
                     const auth = sessionStorage.getItem('gotty_auth');
                     if (auth) {
                         xhr.setRequestHeader('Authorization', `Basic ${auth}`);
                     }
-                    
+
                     xhr.send(formData);
                 });
-                
+
                 completedFiles += normalFiles.length;
                 uploadedBytes += totalSize;
 
@@ -399,7 +399,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             // Upload large files with chunking (with individual progress)
             for (let i = 0; i < largeFiles.length; i++) {
                 const { file, path } = largeFiles[i];
-                
+
                 setBatchUploadStats(prev => prev ? {
                     ...prev,
                     completedFiles,
@@ -408,7 +408,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 } : null);
 
                 await uploadChunkedFile(file, path);
-                
+
                 completedFiles++;
                 uploadedBytes += file.size;
 
@@ -528,22 +528,22 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
 
         try {
             const startTime = Date.now();
-            
+
             // Use XMLHttpRequest for progress tracking
             await new Promise<void>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                
+
                 xhr.open('POST', 'api/batch-download');
-                
+
                 // Add auth headers
                 const auth = sessionStorage.getItem('gotty_auth');
                 if (auth) {
                     xhr.setRequestHeader('Authorization', `Basic ${auth}`);
                 }
                 xhr.setRequestHeader('Content-Type', 'application/json');
-                
+
                 xhr.responseType = 'blob';
-                
+
                 // Track download progress
                 xhr.addEventListener('progress', (e) => {
                     if (e.lengthComputable) {
@@ -561,7 +561,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         });
                     }
                 });
-                
+
                 xhr.addEventListener('load', () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         const blob = xhr.response;
@@ -573,7 +573,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         a.click();
                         window.URL.revokeObjectURL(url);
                         document.body.removeChild(a);
-                        
+
                         // Show complete status briefly
                         setBatchDownloadProgress({
                             status: 'complete',
@@ -583,21 +583,21 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             speed: 0,
                             remainingTime: 0
                         });
-                        
+
                         setTimeout(() => {
                             setBatchDownloadProgress(null);
                         }, 2000);
-                        
+
                         resolve();
                     } else {
                         reject(new Error('Batch download failed'));
                     }
                 });
-                
+
                 xhr.addEventListener('error', () => {
                     reject(new Error('Batch download failed'));
                 });
-                
+
                 xhr.send(JSON.stringify({ files: filePaths }));
             });
 
@@ -626,7 +626,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
 
         // Check if file type is supported for preview
         const canPreview = imageMimeTypes.includes(ext) || videoMimeTypes.includes(ext) || codeMimeTypes.includes(ext) || textMimeTypes.includes(ext) || markdownTypes.includes(ext) || htmlTypes.includes(ext) || spreadsheetTypes.includes(ext) || docTypes.includes(ext) || pdfTypes.includes(ext);
-        
+
         if (!canPreview) {
             // Show custom dialog for unsupported file types
             setConfirmDownload({ file, show: true });
@@ -703,10 +703,6 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         }
         if (previewFile?.type === 'pdf' && previewFile.content) {
             window.URL.revokeObjectURL(previewFile.content);
-        }
-        // Exit fullscreen if active
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
         }
         setPreviewFile(null);
         setIsPreviewFullscreen(false);
@@ -811,11 +807,11 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const loadMorePdfThumbnails = async () => {
         if (!pdfState || pdfThumbLoading) return;
         if (pdfState.renderedPages >= pdfState.totalPages) return;
-        
+
         // Find the first missing page
         const nextIndex = pdfState.thumbnails.findIndex((item) => item === null);
         if (nextIndex === -1) return;
-        
+
         const { batchSize } = getPdfGridMetrics();
         await renderPdfThumbnailBatch(pdfState.pdfDoc, nextIndex + 1, batchSize);
     };
@@ -831,7 +827,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
 
     useEffect(() => {
         if (!pdfState || pdfState.viewMode !== 'grid') return;
-        
+
         // Find the first placeholder to observe (the "frontier" of rendered content)
         const firstNullIndex = pdfState.thumbnails.findIndex(t => t === null);
         if (firstNullIndex === -1) return;
@@ -929,15 +925,15 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
 
         try {
             let textToCopy = previewFile.content;
-            
+
             // For CSV, convert to plain text
             if (previewFile.type === 'csv') {
                 textToCopy = previewFile.content;
             }
-            
+
             await navigator.clipboard.writeText(textToCopy);
             setCopySuccess(true);
-            
+
             // Reset success message after 2 seconds
             setTimeout(() => {
                 setCopySuccess(false);
@@ -948,33 +944,9 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         }
     };
 
-    const toggleFullscreen = async () => {
-        if (!previewContainerRef.current) return;
-
-        try {
-            if (!document.fullscreenElement) {
-                await previewContainerRef.current.requestFullscreen();
-                setIsPreviewFullscreen(true);
-            } else {
-                await document.exitFullscreen();
-                setIsPreviewFullscreen(false);
-            }
-        } catch (err) {
-            console.error('Fullscreen error:', err);
-        }
+    const toggleFullscreen = () => {
+        setIsPreviewFullscreen(prev => !prev);
     };
-
-    // Listen for fullscreen change events
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            setIsPreviewFullscreen(!!document.fullscreenElement);
-        };
-
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => {
-            document.removeEventListener('fullscreenchange', handleFullscreenChange);
-        };
-    }, []);
 
     const handleDelete = (file: FileInfo) => {
         setConfirmDelete({ file, show: true });
@@ -1135,7 +1107,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                 }
                 const headers = parsed.meta.fields || [];
                 const rows = parsed.data as any[];
-                
+
                 return `
                     <table>
                         <thead>
@@ -1154,7 +1126,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
 
         return (
             <div className="preview-overlay" onClick={closePreview}>
-                <div 
+                <div
                     ref={previewContainerRef}
                     className={`preview-container ${isPreviewFullscreen ? 'fullscreen' : ''}`}
                     onClick={(e) => e.stopPropagation()}
@@ -1163,34 +1135,34 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         <h3>{previewFile.file.name}</h3>
                         <div className="preview-header-actions">
                             {(previewFile.type === 'code' || previewFile.type === 'csv' || previewFile.type === 'html') && (
-                                <button 
+                                <button
                                     className={`preview-action-btn copy-btn ${copySuccess ? 'copy-success' : ''}`}
                                     onClick={handleCopyContent}
                                     title="复制内容"
                                 >
                                     {copySuccess ? (
                                         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                                         </svg>
                                     ) : (
                                         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
                                         </svg>
                                     )}
                                 </button>
                             )}
-                            <button 
-                                className="preview-action-btn" 
+                            <button
+                                className="preview-action-btn"
                                 onClick={toggleFullscreen}
                                 title={isPreviewFullscreen ? '退出全屏' : '全屏'}
                             >
                                 {isPreviewFullscreen ? (
                                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                                        <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
                                     </svg>
                                 ) : (
                                     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                                        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
                                     </svg>
                                 )}
                             </button>
@@ -1204,36 +1176,36 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             <img src={previewFile.content} alt={previewFile.file.name} />
                         )}
                         {previewFile.type === 'markdown' && previewFile.content && (
-                            <div 
-                                className="markdown-preview" 
+                            <div
+                                className="markdown-preview"
                                 dangerouslySetInnerHTML={{ __html: marked(previewFile.content) as string }}
                             />
                         )}
                         {previewFile.type === 'html' && previewFile.content && (
                             <div className="html-preview-stage">
                                 <div className="html-preview-wrapper">
-                                <iframe 
-                                    srcDoc={previewFile.content}
-                                    className="html-preview"
-                                    sandbox="allow-scripts allow-forms allow-popups allow-modals"
-                                />
+                                    <iframe
+                                        srcDoc={previewFile.content}
+                                        className="html-preview"
+                                        sandbox="allow-scripts allow-forms allow-popups allow-modals"
+                                    />
                                 </div>
                             </div>
                         )}
                         {previewFile.type === 'code' && previewFile.content && (
                             <pre className="code-preview">
-                                <code 
+                                <code
                                     className={`hljs language-${getLanguage(previewFile.file.name)}`}
-                                    dangerouslySetInnerHTML={{ 
+                                    dangerouslySetInnerHTML={{
                                         __html: highlightCode(previewFile.content, getLanguage(previewFile.file.name))
                                     }}
                                 />
                             </pre>
                         )}
                         {previewFile.type === 'video' && previewFile.content && (
-                            <video 
-                                className="video-preview" 
-                                controls 
+                            <video
+                                className="video-preview"
+                                controls
                                 src={previewFile.content}
                             >
                                 您的浏览器不支持视频播放
@@ -1241,23 +1213,23 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         )}
                         {previewFile.type === 'csv' && previewFile.content && (
                             <div className="table-preview-container">
-                                <div 
-                                    className="csv-preview" 
+                                <div
+                                    className="csv-preview"
                                     dangerouslySetInnerHTML={{ __html: renderCsvTable(previewFile.content) }}
                                 />
                             </div>
                         )}
                         {previewFile.type === 'xlsx' && previewFile.content && (
                             <div className="table-preview-container">
-                                <div 
-                                    className="xlsx-preview" 
+                                <div
+                                    className="xlsx-preview"
                                     dangerouslySetInnerHTML={{ __html: previewFile.content }}
                                 />
                             </div>
                         )}
                         {previewFile.type === 'docx' && previewFile.content && (
-                            <div 
-                                className="docx-preview" 
+                            <div
+                                className="docx-preview"
                                 dangerouslySetInnerHTML={{ __html: previewFile.content }}
                             />
                         )}
@@ -1430,10 +1402,10 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                 </span>
                             </div>
                             <div className="stats-progress-bar">
-                                <div 
-                                    className="stats-progress-fill" 
-                                    style={{ 
-                                        width: `${(batchUploadStats.uploadedBytes / batchUploadStats.totalBytes) * 100}%` 
+                                <div
+                                    className="stats-progress-fill"
+                                    style={{
+                                        width: `${(batchUploadStats.uploadedBytes / batchUploadStats.totalBytes) * 100}%`
                                     }}
                                 />
                             </div>
@@ -1475,8 +1447,8 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                         </span>
                                     </div>
                                     <div className="progress-bar">
-                                        <div 
-                                            className="progress-bar-fill" 
+                                        <div
+                                            className="progress-bar-fill"
                                             style={{ width: `${(progress.progress / progress.total) * 100}%` }}
                                         />
                                     </div>
@@ -1493,8 +1465,8 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                     <span className="progress-percent">{Math.round(downloadProgress.progress)}%</span>
                                 </div>
                                 <div className="progress-bar">
-                                    <div 
-                                        className="progress-bar-fill" 
+                                    <div
+                                        className="progress-bar-fill"
                                         style={{ width: `${downloadProgress.progress}%` }}
                                     />
                                 </div>
@@ -1512,7 +1484,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                     </div>
                                 </div>
                             )}
-                            
+
                             {batchDownloadProgress.status === 'downloading' && (
                                 <div className="download-stats">
                                     <div className="stats-header">
@@ -1522,10 +1494,10 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                         </span>
                                     </div>
                                     <div className="stats-progress-bar">
-                                        <div 
-                                            className="stats-progress-fill" 
-                                            style={{ 
-                                                width: `${(batchDownloadProgress.downloaded / batchDownloadProgress.totalBytes) * 100}%` 
+                                        <div
+                                            className="stats-progress-fill"
+                                            style={{
+                                                width: `${(batchDownloadProgress.downloaded / batchDownloadProgress.totalBytes) * 100}%`
                                             }}
                                         />
                                     </div>
@@ -1552,7 +1524,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                 <div className="download-complete">
                                     <div className="complete-icon">
                                         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                                         </svg>
                                     </div>
                                     <div className="complete-text">
@@ -1728,7 +1700,7 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                     <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
                         <div className="confirm-dialog-header">
                             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M11 15h2v-2h-2v2zm0-8h2V5h-2v2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+                                <path d="M11 15h2v-2h-2v2zm0-8h2V5h-2v2zm.99-5C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" />
                             </svg>
                             <h3>无法预览</h3>
                         </div>
