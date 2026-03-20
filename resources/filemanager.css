@@ -371,12 +371,18 @@
     font-size: 14px;
     z-index: 1000;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-    display: flex;
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s, opacity 0.3s;
+    display: none;
     align-items: center;
     justify-content: center;
     user-select: none;
     touch-action: none;
+    opacity: 0;
+}
+
+.file-manager-btn.ready {
+    display: flex;
+    opacity: 1;
 }
 
 .file-manager-btn:hover {
@@ -2608,4 +2614,78 @@ input[type="checkbox"] {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .share-page {
+        padding: 16px;
+    }
+
+    .share-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .share-page-header h1 {
+        font-size: 16px;
+        word-break: break-all;
+    }
+
+    .share-page-header-right {
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .share-expires-info {
+        font-size: 12px;
+    }
+
+    .share-download-btn {
+        padding: 8px 14px;
+        font-size: 13px;
+    }
+
+    .file-manager {
+        width: 98%;
+        max-height: 90vh;
+        border-radius: 6px;
+    }
+
+    .breadcrumb {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .search-box {
+        min-width: 120px;
+        max-width: none;
+        flex: 1;
+    }
+
+    .upload-section {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .upload-btn,
+    .refresh-btn,
+    .batch-download-btn,
+    .batch-delete-btn,
+    .share-manage-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .file-manager-body {
+        padding: 12px;
+    }
+
+    .share-page-files table th,
+    .share-page-files table td {
+        padding: 8px 6px;
+        font-size: 12px;
+    }
 }

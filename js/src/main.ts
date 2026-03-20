@@ -27,6 +27,14 @@ function loadScript(src: string): Promise<void> {
     });
 }
 
+function hidePageLoader() {
+    const loader = document.getElementById('page-loader');
+    if (loader) {
+        loader.classList.add('hidden');
+        setTimeout(() => loader.remove(), 300);
+    }
+}
+
 const initTerminal = (authToken: string = '') => {
     const elem = document.getElementById("terminal");
 
@@ -88,6 +96,7 @@ if (shareMatch) {
         h(SharePage, { token: shareToken, basePath }),
         shareContainer
     );
+    hidePageLoader();
 } else {
     // Normal page: load config scripts then initialize
     Promise.all([loadScript('./auth_token.js'), loadScript('./config.js')]).then(() => {
@@ -98,6 +107,7 @@ if (shareMatch) {
             const loginContainer = document.createElement("div");
             loginContainer.id = "login-container";
             document.body.appendChild(loginContainer);
+            hidePageLoader();
 
             render(
                 h(Login, {
@@ -113,18 +123,23 @@ if (shareMatch) {
         } else {
             initTerminal(storedAuth || '');
             initFileManager();
+            hidePageLoader();
         }
     }).catch((err) => {
         console.error('Failed to load config scripts:', err);
         // Fallback: try to initialize anyway
         initTerminal('');
         initFileManager();
+        hidePageLoader();
     });
 }
 
 function initFileManager() {
     const fileManagerBtn = document.getElementById("file-manager-btn") as HTMLElement | null;
     if (!fileManagerBtn) return;
+
+    // Show the button now that initialization is complete
+    fileManagerBtn.classList.add('ready');
 
     let fileManagerContainer: HTMLDivElement | null = null;
 
