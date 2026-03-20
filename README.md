@@ -17,6 +17,9 @@ GoTTY是一个简单的命令行工具，可以将命令行工具转换为Web应
 - **Web终端访问** - 通过浏览器访问您的终端
 - **身份认证** - 支持基本认证与自定义登录界面
 - **文件管理** - 上传/下载/删除/批量操作，支持文件夹上传
+- **文件搜索** - 递归搜索文件和文件夹，300ms防抖，点击结果快速跳转
+- **文件分享** - 生成分享链接，支持密码保护、过期时间、公开访问
+- **分享管理** - 查看/删除分享，分享状态一目了然
 - **文件预览** - 代码高亮、图片/视频、Markdown/HTML/CSV/Excel/Word/PDF
 - **PDF预览** - 缩略图网格与单页查看
 - **快速复制** - 代码与CSV一键复制
@@ -71,6 +74,7 @@ make build t="linux:amd64"
 
 ### 文件管理器
 - **文件列表**：显示文件名、大小、修改时间，支持多选
+- **文件搜索**：面包屑栏内搜索框，递归搜索当前路径下所有文件和文件夹，300ms防抖避免频繁请求，搜索结果点击跳转至对应目录
 - **批量操作**：上传、下载、删除多个文件
 - **进度显示**：上传和下载都有实时进度条
 
@@ -79,6 +83,13 @@ make build t="linux:amd64"
 - **文档预览**：Markdown、HTML、CSV表格、Excel、Word
 - **媒体预览**：图片缩放、视频播放控制
 - **快速操作**：一键复制、全屏查看、关闭预览
+
+### 文件分享
+- **创建分享**：为文件或文件夹生成公开访问链接
+- **密码保护**：可设置分享密码
+- **过期时间**：支持1小时/1天/7天/30天/永不过期
+- **分享页面**：独立的公开分享页面，支持在线预览和下载
+- **分享管理**：列出所有分享，查看状态、复制链接、删除分享
 
 ### 安全认证
 - **自定义登录**：深色主题登录界面
@@ -152,35 +163,35 @@ max_connection = 0
 
 常用参数：
 
-| 参数 | 说明 | 默认值 |
-| --- | --- | --- |
-| `-a, --address` | 监听地址 | `0.0.0.0` |
-| `-p, --port` | 监听端口 | `8080` |
-| `-m, --path` | 访问路径前缀 | `/` |
-| `-w, --permit-write` | 允许客户端写入 | `false` |
-| `--config` | 配置文件路径 | `~/.gotty` |
-| `-c, --credential` | Basic Auth 凭据（user:pass） | `""` |
-| `-r, --random-url` | 启用随机URL | `false` |
-| `--random-url-length` | 随机URL长度 | `8` |
-| `-t, --tls` | 启用TLS/SSL | `false` |
-| `--tls-crt` | TLS证书路径 | `~/.gotty.crt` |
-| `--tls-key` | TLS密钥路径 | `~/.gotty.key` |
-| `--tls-ca-crt` | 客户端认证CA证书 | `~/.gotty.ca.crt` |
-| `--index` | 自定义 index.html | `""` |
-| `--title-format` | 浏览器标题模板 | `{{ .command }}@{{ .hostname }}` |
-| `--reconnect` | 启用自动重连 | `false` |
-| `--reconnect-time` | 重连间隔（秒） | `10` |
-| `--max-connection` | 最大连接数 | `0` |
-| `--once` | 仅接受一个客户端 | `false` |
-| `--timeout` | 等待连接超时（秒） | `0` |
-| `--permit-arguments` | 允许URL参数传递命令行参数 | `false` |
-| `--pass-headers` | 透传请求头为环境变量 | `false` |
-| `--width` | 固定终端宽度 | `0` |
-| `--height` | 固定终端高度 | `0` |
-| `--ws-origin` | WebSocket Origin 正则 | `""` |
-| `--ws-query-args` | WebSocket 追加参数 | `""` |
-| `--enable-webgl` | 启用WebGL渲染 | `true` |
-| `--quiet` | 禁止日志输出 | `false` |
+| 参数                  | 说明                         | 默认值                           |
+| --------------------- | ---------------------------- | -------------------------------- |
+| `-a, --address`       | 监听地址                     | `0.0.0.0`                        |
+| `-p, --port`          | 监听端口                     | `8080`                           |
+| `-m, --path`          | 访问路径前缀                 | `/`                              |
+| `-w, --permit-write`  | 允许客户端写入               | `false`                          |
+| `--config`            | 配置文件路径                 | `~/.gotty`                       |
+| `-c, --credential`    | Basic Auth 凭据（user:pass） | `""`                             |
+| `-r, --random-url`    | 启用随机URL                  | `false`                          |
+| `--random-url-length` | 随机URL长度                  | `8`                              |
+| `-t, --tls`           | 启用TLS/SSL                  | `false`                          |
+| `--tls-crt`           | TLS证书路径                  | `~/.gotty.crt`                   |
+| `--tls-key`           | TLS密钥路径                  | `~/.gotty.key`                   |
+| `--tls-ca-crt`        | 客户端认证CA证书             | `~/.gotty.ca.crt`                |
+| `--index`             | 自定义 index.html            | `""`                             |
+| `--title-format`      | 浏览器标题模板               | `{{ .command }}@{{ .hostname }}` |
+| `--reconnect`         | 启用自动重连                 | `false`                          |
+| `--reconnect-time`    | 重连间隔（秒）               | `10`                             |
+| `--max-connection`    | 最大连接数                   | `0`                              |
+| `--once`              | 仅接受一个客户端             | `false`                          |
+| `--timeout`           | 等待连接超时（秒）           | `0`                              |
+| `--permit-arguments`  | 允许URL参数传递命令行参数    | `false`                          |
+| `--pass-headers`      | 透传请求头为环境变量         | `false`                          |
+| `--width`             | 固定终端宽度                 | `0`                              |
+| `--height`            | 固定终端高度                 | `0`                              |
+| `--ws-origin`         | WebSocket Origin 正则        | `""`                             |
+| `--ws-query-args`     | WebSocket 追加参数           | `""`                             |
+| `--enable-webgl`      | 启用WebGL渲染                | `true`                           |
+| `--quiet`             | 禁止日志输出                 | `false`                          |
 
 ## 功能说明
 
@@ -198,6 +209,9 @@ max_connection = 0
 ### 3. 文件管理与预览
 
 - 上传/下载/删除/批量操作，支持文件夹上传与分片上传
+- 文件搜索：递归搜索，300ms防抖，最多返回100条结果
+- 文件分享：生成公开链接，支持密码保护与过期时间
+- 分享管理面板：查看所有分享状态，一键复制链接或删除
 - 缩略图预览与单页查看 PDF
 - 多格式预览：代码、图片、视频、Markdown、HTML、CSV、Excel、Word
 - 快捷操作：复制内容、全屏、点击空白关闭
@@ -217,7 +231,8 @@ gotty/
 ├── server/             # 服务器逻辑
 │   ├── server.go       # HTTP服务器
 │   ├── handlers.go     # 请求处理
-│   ├── file_handler.go # 文件管理API
+│   ├── file_handler.go # 文件管理API（含搜索）
+│   ├── share_handler.go# 文件分享API
 │   ├── auth_handler.go # 认证API
 │   └── middleware.go   # 中间件
 ├── webtty/             # WebSocket终端协议
@@ -226,7 +241,8 @@ gotty/
 │   ├── src/
 │   │   ├── main.ts           # 入口文件
 │   │   ├── Login.tsx         # 登录组件
-│   │   ├── FileManager.tsx   # 文件管理器组件（含预览功能）
+│   │   ├── FileManager.tsx   # 文件管理器组件（含搜索、预览、分享）
+│   │   ├── SharePage.tsx     # 公开分享页面
 │   │   ├── webtty.tsx        # WebSocket终端
 │   │   └── xterm.tsx         # xterm封装
 │   ├── package.json    # 前端依赖
