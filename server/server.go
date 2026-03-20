@@ -227,6 +227,7 @@ func (server *Server) setupHandlers(ctx context.Context, cancel context.CancelFu
 	authMux.HandleFunc(pathPrefix+"api/download", server.handleFileDownload)
 	authMux.HandleFunc(pathPrefix+"api/batch-download", server.handleBatchDownload)
 	authMux.HandleFunc(pathPrefix+"api/files", server.handleFileList)
+	authMux.HandleFunc(pathPrefix+"api/search", server.handleFileSearch)
 	authMux.HandleFunc(pathPrefix+"api/delete", server.handleFileDelete)
 
 	// Share management endpoints (requires auth)

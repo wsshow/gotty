@@ -717,6 +717,86 @@ func (server *Server) handleFileDelete(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, `{"success": true, "message": "File deleted successfully"}`)
 }
 
+// handleFileSearch handles file search requests with recursive directory walking
+func (server *Server) handleFileSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		http.Error(w, "Search query is required", http.StatusBadRequest)
+		return
+	}
+
+	// Limit query length
+	if len(query) > 200 {
+		http.Error(w, "Search query too long", http.StatusBadRequest)
+		return
+	}
+
+	subPath := r.URL.Query().Get("path")
+	if subPath == "" {
+		subPath = "."
+	}
+
+	subPath = filepath.Clean(subPath)
+	if strings.HasPrefix(subPath, "..") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	rootDir := filepath.Join(uploadPath, subPath)
+	if info, err := os.Stat(rootDir); err != nil || !info.IsDir() {
+		http.Error(w, "Invalid search path", http.StatusBadRequest)
+		return
+	}
+
+	queryLower := strings.ToLower(query)
+	var results []map[string]interface{}
+	maxResults := 100
+
+	filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		// Skip hidden dirs and temp dir
+		if info.IsDir() && (strings.HasPrefix(info.Name(), ".")) {
+			return filepath.SkipDir
+		}
+		// Skip the root itself
+		if path == rootDir {
+			return nil
+		}
+
+		if len(results) >= maxResults {
+			return filepath.SkipAll
+		}
+
+		if strings.Contains(strings.ToLower(info.Name()), queryLower) {
+			relPath, _ := filepath.Rel(uploadPath, path)
+			entry := map[string]interface{}{
+				"name":  info.Name(),
+				"path":  relPath,
+				"isDir": info.IsDir(),
+				"time":  info.ModTime().Unix(),
+			}
+			if !info.IsDir() {
+				entry["size"] = info.Size()
+			}
+			results = append(results, entry)
+		}
+		return nil
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"results": results,
+		"query":   query,
+	})
+}
+
 // cleanupOldTempFiles removes old temporary upload directories
 func cleanupOldTempFiles() {
 	// Check if temp directory exists
