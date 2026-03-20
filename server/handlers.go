@@ -305,7 +305,8 @@ func (server *Server) indexVariables(r *http.Request) (map[string]interface{}, e
 	}
 
 	indexVars := map[string]interface{}{
-		"title": titleBuf.String(),
+		"title":    titleBuf.String(),
+		"basePath": server.pathPrefix,
 	}
 	return indexVars, err
 }

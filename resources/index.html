@@ -2,6 +2,7 @@
 <html>
 
 <head>
+  <base href="{{ .basePath }}">
   <title>{{ .title }}</title>
   <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
   <link rel="icon" href="favicon.ico">
@@ -22,8 +23,6 @@
     </svg>
   </button>
   <div id="terminal"></div>
-  <script src="./auth_token.js"></script>
-  <script src="./config.js"></script>
   <script src="./js/gotty.js"></script>
 </body>
 

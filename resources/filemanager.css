@@ -339,6 +339,15 @@
     fill: #ff6b6b;
 }
 
+.share-btn:hover {
+    background: #1f3a2f;
+    border-color: #2f5a3f;
+}
+
+.share-btn:hover svg {
+    fill: #5dde8f;
+}
+
 .no-files {
     text-align: center;
     padding: 60px 20px;
@@ -1947,4 +1956,442 @@ input[type="checkbox"] {
 .preview-container.fullscreen .pdf-grid {
     max-height: calc(100vh - 140px);
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* Share Dialog */
+.share-dialog {
+    max-width: 500px;
+}
+
+.share-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.share-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.share-field label {
+    color: #aaa;
+    font-size: 13px;
+}
+
+.share-input,
+.share-select {
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #fff;
+    padding: 8px 12px;
+    font-size: 14px;
+    outline: none;
+}
+
+.share-input:focus,
+.share-select:focus {
+    border-color: #5dade2;
+}
+
+.share-select option {
+    background: #2d2d2d;
+    color: #fff;
+}
+
+.share-result {
+    margin-top: 12px;
+}
+
+.share-link-box {
+    display: flex;
+    gap: 8px;
+}
+
+.share-link-input {
+    flex: 1;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #5dade2;
+    padding: 8px 12px;
+    font-size: 13px;
+    outline: none;
+}
+
+.share-copy-btn {
+    background: #1e3a5f;
+    border: 1px solid #2d5a8f;
+    border-radius: 6px;
+    color: #5dade2;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.share-copy-btn:hover {
+    background: #2d5a8f;
+}
+
+.share-hint {
+    color: #aaa;
+    font-size: 12px;
+    margin-top: 8px;
+}
+
+.confirm-share-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    background: #1f4a2f;
+    color: #5dde8f;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.confirm-share-btn:hover {
+    background: #2a6a3f;
+}
+
+.confirm-share-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: #5dde8f;
+}
+
+/* Share Page */
+.share-page {
+    min-height: 100vh;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 20px;
+}
+
+.share-page-loading,
+.share-page-error,
+.share-page-password {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 16px;
+}
+
+.share-page-error p {
+    color: #ff6b6b;
+    font-size: 16px;
+}
+
+.share-page-password h2 {
+    color: #fff;
+    margin: 12px 0 4px;
+}
+
+.share-page-password p {
+    color: #aaa;
+    margin: 0 0 16px;
+}
+
+.share-password-form {
+    display: flex;
+    gap: 8px;
+}
+
+.share-password-btn {
+    background: #1e3a5f;
+    border: 1px solid #2d5a8f;
+    border-radius: 6px;
+    color: #5dade2;
+    padding: 8px 20px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.share-password-btn:hover {
+    background: #2d5a8f;
+}
+
+.share-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #333;
+}
+
+.share-page-header h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.share-page-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.share-expires-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #aaa;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.share-download-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #1e3a5f;
+    border: 1px solid #2d5a8f;
+    border-radius: 8px;
+    color: #5dade2;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.share-download-btn:hover {
+    background: #2d5a8f;
+}
+
+.share-download-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: #5dade2;
+}
+
+.share-page-files {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.share-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.share-back-btn {
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 6px;
+    color: #ccc;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.share-back-btn:hover {
+    background: #3d3d3d;
+}
+
+.share-current-path {
+    color: #888;
+    font-size: 13px;
+}
+
+.share-file-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #222;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.share-file-table th {
+    text-align: left;
+    background: #2d2d2d;
+    color: #aaa;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.share-file-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #333;
+    font-size: 14px;
+}
+
+.share-file-table tr:hover {
+    background: #2a2a2a;
+}
+
+.share-folder-name,
+.share-file-name {
+    cursor: pointer;
+    color: #5dade2;
+}
+
+.share-folder-name:hover,
+.share-file-name:hover {
+    text-decoration: underline;
+}
+
+.share-action-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 16px;
+    color: #ccc;
+}
+
+.share-action-btn:hover {
+    background: #2d2d2d;
+    border-color: #444;
+}
+
+.share-action-btn:hover svg path {
+    fill: #fff;
+}
+
+.share-empty {
+    text-align: center;
+    color: #666;
+    padding: 40px;
+    font-size: 15px;
+}
+
+.share-inline-preview {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.share-inline-preview img,
+.share-inline-preview video {
+    display: block;
+    margin: 0 auto;
+}
+
+.share-inline-preview .code-preview,
+.share-inline-preview .table-preview-container,
+.share-inline-preview .xlsx-preview,
+.share-inline-preview .docx-preview,
+.share-inline-preview .markdown-preview,
+.share-inline-preview .html-preview-stage {
+    width: 100%;
+}
+
+.share-inline-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    background: #1a1a2e;
+    padding: 0;
+    margin: 0;
+    max-width: none;
+    overflow: auto;
+}
+
+.share-inline-fullscreen img,
+.share-inline-fullscreen video {
+    max-height: 100vh !important;
+}
+
+.share-inline-fullscreen iframe {
+    height: 100vh !important;
+}
+
+.share-fullscreen-exit {
+    position: fixed;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s, transform 0.3s;
+    user-select: none;
+    touch-action: none;
+    opacity: 0.8;
+}
+
+.share-fullscreen-exit:active {
+    cursor: grabbing;
+}
+
+.share-fullscreen-exit:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.share-fullscreen-exit.docked {
+    opacity: 0.4;
+}
+
+.share-fullscreen-exit.docked:hover {
+    opacity: 1;
+}
+
+.share-page-single {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+}
+
+.share-single-download {
+    text-align: center;
+    padding: 40px;
+}
+
+.share-single-download p {
+    color: #aaa;
+    margin-bottom: 16px;
+}
+
+.share-unsupported-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #aaa;
+}
+
+.share-unsupported-preview svg {
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.share-unsupported-preview p {
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+.share-unsupported-preview .share-action-btn {
+    margin-top: 0;
 }

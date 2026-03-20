@@ -3,6 +3,7 @@ import { Terminal, WebTTY, protocols } from "./webtty";
 import { GoTTYXterm } from "./xterm";
 import { FileManager } from "./FileManager";
 import { Login } from "./Login";
+import { SharePage } from "./SharePage";
 import { h, render } from "preact";
 
 // Type-safe access to server-injected global variables
@@ -15,9 +16,16 @@ interface GoTTYWindow extends Window {
 
 const gottyWindow = window as GoTTYWindow;
 
-// Check if authentication is required
-const authRequired = gottyWindow.gotty_enable_auth === true;
-const storedAuth = sessionStorage.getItem('gotty_auth');
+// Load a script dynamically and return a promise
+function loadScript(src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.head.appendChild(script);
+    });
+}
 
 const initTerminal = (authToken: string = '') => {
     const elem = document.getElementById("terminal");
@@ -27,6 +35,7 @@ const initTerminal = (authToken: string = '') => {
         term = new GoTTYXterm(elem);
 
         const httpsEnabled = window.location.protocol == "https:";
+        const authRequired = gottyWindow.gotty_enable_auth === true;
         let queryArgs = (gottyWindow.gotty_ws_query_args || "") === "" ? "" : "?" + (gottyWindow.gotty_ws_query_args || "");
 
         // Add auth token to query if authentication is enabled
@@ -61,26 +70,56 @@ const initTerminal = (authToken: string = '') => {
     }
 };
 
-// Show login if auth is required and not authenticated
-if (authRequired && !storedAuth) {
-    const loginContainer = document.createElement("div");
-    loginContainer.id = "login-container";
-    document.body.appendChild(loginContainer);
-
+// Check if this is a share page
+const shareMatch = window.location.pathname.match(/\/s\/([a-f0-9]+)\/?$/);
+if (shareMatch) {
+    // Share page: no need to load auth_token.js or config.js
+    const shareToken = shareMatch[1];
+    const basePath = window.location.pathname.replace(/s\/[a-f0-9]+\/?$/, '');
+    const shareContainer = document.createElement("div");
+    shareContainer.id = "share-page-container";
+    document.body.appendChild(shareContainer);
+    // Hide terminal and file manager button if present
+    const termElem = document.getElementById("terminal");
+    if (termElem) termElem.style.display = "none";
+    const fmBtn = document.getElementById("file-manager-btn");
+    if (fmBtn) fmBtn.style.display = "none";
     render(
-        h(Login, {
-            onSuccess: (token: string) => {
-                render(null, loginContainer);
-                document.body.removeChild(loginContainer);
-                initTerminal(token);
-                initFileManager();
-            }
-        }),
-        loginContainer
+        h(SharePage, { token: shareToken, basePath }),
+        shareContainer
     );
 } else {
-    initTerminal(storedAuth || '');
-    initFileManager();
+    // Normal page: load config scripts then initialize
+    Promise.all([loadScript('./auth_token.js'), loadScript('./config.js')]).then(() => {
+        const authRequired = gottyWindow.gotty_enable_auth === true;
+        const storedAuth = sessionStorage.getItem('gotty_auth');
+
+        if (authRequired && !storedAuth) {
+            const loginContainer = document.createElement("div");
+            loginContainer.id = "login-container";
+            document.body.appendChild(loginContainer);
+
+            render(
+                h(Login, {
+                    onSuccess: (token: string) => {
+                        render(null, loginContainer);
+                        document.body.removeChild(loginContainer);
+                        initTerminal(token);
+                        initFileManager();
+                    }
+                }),
+                loginContainer
+            );
+        } else {
+            initTerminal(storedAuth || '');
+            initFileManager();
+        }
+    }).catch((err) => {
+        console.error('Failed to load config scripts:', err);
+        // Fallback: try to initialize anyway
+        initTerminal('');
+        initFileManager();
+    });
 }
 
 function initFileManager() {

@@ -100,6 +100,11 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     } | null>(null);
     const [pdfThumbLoading, setPdfThumbLoading] = useState(false);
     const [pdfPageLoading, setPdfPageLoading] = useState(false);
+    const [shareDialog, setShareDialog] = useState<{ path: string; name: string; isDir: boolean } | null>(null);
+    const [sharePassword, setSharePassword] = useState('');
+    const [shareExpiry, setShareExpiry] = useState(0);
+    const [shareResult, setShareResult] = useState<{ token: string; url: string } | null>(null);
+    const [shareCopied, setShareCopied] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const folderInputRef = useRef<HTMLInputElement>(null);
@@ -948,6 +953,56 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         setIsPreviewFullscreen(prev => !prev);
     };
 
+    const handleShare = (file: FileInfo) => {
+        const filePath = currentPath === '.' ? file.name : `${currentPath}/${file.name}`;
+        setShareDialog({ path: filePath, name: file.name, isDir: file.isDir });
+        setSharePassword('');
+        setShareExpiry(0);
+        setShareResult(null);
+        setShareCopied(false);
+    };
+
+    const createShare = async () => {
+        if (!shareDialog) return;
+        setError(null);
+        try {
+            const response = await fetch('api/share/create', {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    path: shareDialog.path,
+                    password: sharePassword || undefined,
+                    expiresInHours: shareExpiry || undefined,
+                }),
+            });
+            if (!response.ok) throw new Error('Failed to create share');
+            const data = await response.json();
+            const shareUrl = `${window.location.origin}${window.location.pathname}s/${data.token}`;
+            setShareResult({ token: data.token, url: shareUrl });
+        } catch (err) {
+            setError('创建分享链接失败');
+        }
+    };
+
+    const copyShareLink = async () => {
+        if (!shareResult) return;
+        try {
+            await navigator.clipboard.writeText(shareResult.url);
+            setShareCopied(true);
+            setTimeout(() => setShareCopied(false), 2000);
+        } catch {
+            setError('复制失败');
+        }
+    };
+
+    const closeShareDialog = () => {
+        setShareDialog(null);
+        setShareResult(null);
+        setSharePassword('');
+        setShareExpiry(0);
+        setShareCopied(false);
+    };
+
     const handleDelete = (file: FileInfo) => {
         setConfirmDelete({ file, show: true });
     };
@@ -1611,6 +1666,15 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                                     </button>
                                                 )}
                                                 <button
+                                                    className="action-btn share-btn"
+                                                    onClick={() => handleShare(file)}
+                                                    title="分享"
+                                                >
+                                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
+                                                    </svg>
+                                                </button>
+                                                <button
                                                     className="action-btn delete-btn"
                                                     onClick={() => handleDelete(file)}
                                                     title="删除"
@@ -1721,6 +1785,79 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                                 </svg>
                                 下载文件
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {shareDialog && (
+                <div className="confirm-dialog-overlay" onClick={closeShareDialog}>
+                    <div className="confirm-dialog share-dialog" onClick={(e) => e.stopPropagation()}>
+                        <div className="confirm-dialog-header">
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
+                            </svg>
+                            <h3>分享{shareDialog.isDir ? '文件夹' : '文件'}</h3>
+                        </div>
+                        <div className="confirm-dialog-body">
+                            <p>分享: <strong>{shareDialog.name}</strong></p>
+                            {!shareResult ? (
+                                <div className="share-form">
+                                    <div className="share-field">
+                                        <label>访问密码 (可选)</label>
+                                        <input
+                                            type="text"
+                                            value={sharePassword}
+                                            onInput={(e) => setSharePassword((e.target as HTMLInputElement).value)}
+                                            placeholder="留空则无需密码"
+                                            className="share-input"
+                                        />
+                                    </div>
+                                    <div className="share-field">
+                                        <label>有效期</label>
+                                        <select
+                                            value={shareExpiry}
+                                            onChange={(e) => setShareExpiry(Number((e.target as HTMLSelectElement).value))}
+                                            className="share-select"
+                                        >
+                                            <option value={0}>永久有效</option>
+                                            <option value={1}>1小时</option>
+                                            <option value={24}>1天</option>
+                                            <option value={168}>7天</option>
+                                            <option value={720}>30天</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="share-result">
+                                    <div className="share-link-box">
+                                        <input
+                                            type="text"
+                                            value={shareResult.url}
+                                            readOnly
+                                            className="share-link-input"
+                                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                                        />
+                                        <button className="share-copy-btn" onClick={copyShareLink}>
+                                            {shareCopied ? '已复制' : '复制'}
+                                        </button>
+                                    </div>
+                                    {sharePassword && <p className="share-hint">密码: {sharePassword}</p>}
+                                </div>
+                            )}
+                        </div>
+                        <div className="confirm-dialog-footer">
+                            <button className="confirm-cancel-btn" onClick={closeShareDialog}>
+                                {shareResult ? '关闭' : '取消'}
+                            </button>
+                            {!shareResult && (
+                                <button className="confirm-share-btn" onClick={createShare}>
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
+                                    </svg>
+                                    创建分享
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

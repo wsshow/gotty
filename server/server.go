@@ -34,6 +34,7 @@ type Server struct {
 	indexTemplate    *template.Template
 	titleTemplate    *noesctmpl.Template
 	manifestTemplate *template.Template
+	pathPrefix       string
 }
 
 // New creates a new instance of Server.
@@ -157,8 +158,8 @@ func (server *Server) Run(ctx context.Context, options ...RunOption) error {
 		if server.options.EnableTLS {
 			crtFile := homedir.Expand(server.options.TLSCrtFile)
 			keyFile := homedir.Expand(server.options.TLSKeyFile)
-			log.Printf("TLS crt file: " + crtFile)
-			log.Printf("TLS key file: " + keyFile)
+			log.Printf("TLS crt file: %s", crtFile)
+			log.Printf("TLS key file: %s", keyFile)
 
 			err = srv.ServeTLS(listener, crtFile, keyFile)
 		} else {
@@ -199,44 +200,66 @@ func (server *Server) Run(ctx context.Context, options ...RunOption) error {
 }
 
 func (server *Server) setupHandlers(ctx context.Context, cancel context.CancelFunc, pathPrefix string, counter *counter) http.Handler {
+	// Initialize share store
+	initShareStore()
+
+	server.pathPrefix = pathPrefix
+
 	fs, err := fs.Sub(bindata.Fs, "static")
 	if err != nil {
 		log.Fatalf("failed to open static/ subdirectory of embedded filesystem: %v", err)
 	}
 	staticFileHandler := http.FileServer(http.FS(fs))
 
-	var siteMux = http.NewServeMux()
-	siteMux.HandleFunc(pathPrefix, server.handleIndex)
-	siteMux.Handle(pathPrefix+"js/", http.StripPrefix(pathPrefix, staticFileHandler))
-	siteMux.Handle(pathPrefix+"favicon.ico", http.StripPrefix(pathPrefix, staticFileHandler))
-	siteMux.Handle(pathPrefix+"icon.svg", http.StripPrefix(pathPrefix, staticFileHandler))
-	siteMux.Handle(pathPrefix+"css/", http.StripPrefix(pathPrefix, staticFileHandler))
-	siteMux.Handle(pathPrefix+"icon_192.png", http.StripPrefix(pathPrefix, staticFileHandler))
-
-	siteMux.HandleFunc(pathPrefix+"manifest.json", server.handleManifest)
-	siteMux.HandleFunc(pathPrefix+"auth_token.js", server.handleAuthToken)
-	siteMux.HandleFunc(pathPrefix+"config.js", server.handleConfig)
+	// Auth-protected routes (main index, file management, terminal APIs)
+	var authMux = http.NewServeMux()
+	authMux.HandleFunc(pathPrefix, server.handleIndex)
+	authMux.HandleFunc(pathPrefix+"manifest.json", server.handleManifest)
+	authMux.HandleFunc(pathPrefix+"auth_token.js", server.handleAuthToken)
+	authMux.HandleFunc(pathPrefix+"config.js", server.handleConfig)
 
 	// Authentication endpoint (not protected by basic auth)
-	siteMux.HandleFunc(pathPrefix+"api/auth/verify", server.handleAuthVerify)
+	authMux.HandleFunc(pathPrefix+"api/auth/verify", server.handleAuthVerify)
 
 	// File management endpoints
-	siteMux.HandleFunc(pathPrefix+"api/upload", server.handleFileUpload)
-	siteMux.HandleFunc(pathPrefix+"api/upload-chunk", server.handleChunkUpload)
-	siteMux.HandleFunc(pathPrefix+"api/download", server.handleFileDownload)
-	siteMux.HandleFunc(pathPrefix+"api/batch-download", server.handleBatchDownload)
-	siteMux.HandleFunc(pathPrefix+"api/files", server.handleFileList)
-	siteMux.HandleFunc(pathPrefix+"api/delete", server.handleFileDelete)
+	authMux.HandleFunc(pathPrefix+"api/upload", server.handleFileUpload)
+	authMux.HandleFunc(pathPrefix+"api/upload-chunk", server.handleChunkUpload)
+	authMux.HandleFunc(pathPrefix+"api/download", server.handleFileDownload)
+	authMux.HandleFunc(pathPrefix+"api/batch-download", server.handleBatchDownload)
+	authMux.HandleFunc(pathPrefix+"api/files", server.handleFileList)
+	authMux.HandleFunc(pathPrefix+"api/delete", server.handleFileDelete)
 
-	siteHandler := http.Handler(siteMux)
+	// Share management endpoints (requires auth)
+	authMux.HandleFunc(pathPrefix+"api/share/create", server.handleCreateShare)
+	authMux.HandleFunc(pathPrefix+"api/share/delete", server.handleDeleteShare)
+	authMux.HandleFunc(pathPrefix+"api/shares", server.handleListShares)
+
+	authHandler := http.Handler(authMux)
 
 	if server.options.EnableBasicAuth {
 		log.Printf("Using Basic Authentication")
-		siteHandler = server.wrapBasicAuth(siteHandler, server.options.Credential)
+		authHandler = server.wrapBasicAuth(authHandler, server.options.Credential)
 	}
 
-	withGz := gziphandler.GzipHandler(server.wrapHeaders(siteHandler))
-	siteHandler = server.wrapLogger(withGz)
+	// Top-level mux: public routes first, auth-protected fallback
+	topMux := http.NewServeMux()
+	// Static assets (public, no auth needed)
+	topMux.Handle(pathPrefix+"js/", http.StripPrefix(pathPrefix, staticFileHandler))
+	topMux.Handle(pathPrefix+"css/", http.StripPrefix(pathPrefix, staticFileHandler))
+	topMux.Handle(pathPrefix+"favicon.ico", http.StripPrefix(pathPrefix, staticFileHandler))
+	topMux.Handle(pathPrefix+"icon.svg", http.StripPrefix(pathPrefix, staticFileHandler))
+	topMux.Handle(pathPrefix+"icon_192.png", http.StripPrefix(pathPrefix, staticFileHandler))
+	// Public share page
+	topMux.HandleFunc(pathPrefix+"s/", server.handleIndex)
+	// Public share API endpoints
+	topMux.HandleFunc(pathPrefix+"api/share/info", server.handleShareInfo)
+	topMux.HandleFunc(pathPrefix+"api/share/files", server.handleShareFiles)
+	topMux.HandleFunc(pathPrefix+"api/share/download", server.handleShareDownload)
+	topMux.HandleFunc(pathPrefix+"api/share/batch-download", server.handleShareBatchDownload)
+	// Auth-protected routes as fallback
+	topMux.Handle("/", authHandler)
+
+	siteHandler := server.wrapLogger(gziphandler.GzipHandler(server.wrapHeaders(http.Handler(topMux))))
 
 	wsMux := http.NewServeMux()
 	wsMux.Handle("/", siteHandler)
