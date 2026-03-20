@@ -1077,7 +1077,9 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const loadShareList = async () => {
         setShareListLoading(true);
         try {
-            const response = await fetch('./api/shares');
+            const response = await fetch('./api/shares', {
+                headers: getAuthHeaders(),
+            });
             if (!response.ok) throw new Error('Failed to load shares');
             const data = await response.json();
             setShareList(data.shares || []);
@@ -1097,7 +1099,10 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
 
     const deleteShare = async (token: string) => {
         try {
-            const response = await fetch(`./api/share/delete?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
+            const response = await fetch(`./api/share/delete?token=${encodeURIComponent(token)}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders(),
+            });
             if (!response.ok) throw new Error('Failed to delete share');
             setShareList(prev => prev.filter(s => s.token !== token));
         } catch (err) {
