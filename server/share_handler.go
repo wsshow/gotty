@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	sharesFile = "./uploads/.shares.json"
+	sharesFile = "./fktty/.shares.json"
 )
 
 type ShareInfo struct {
