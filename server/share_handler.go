@@ -294,22 +294,29 @@ func (server *Server) handleShareInfo(w http.ResponseWriter, r *http.Request) {
 	// Return basic info without validating password first
 	// The client needs to know if password is required
 	result := map[string]interface{}{
-		"path":        info.Path,
 		"isDir":       info.IsDir,
 		"hasPassword": info.Password != "",
-		"expiresAt":   info.ExpiresAt,
 		"name":        filepath.Base(info.Path),
 	}
 
 	// If password is set, check if caller provided correct one
+	authenticated := true
 	if info.Password != "" {
 		password := r.URL.Query().Get("password")
 		if password == "" {
 			password = r.Header.Get("X-Share-Password")
 		}
-		result["authenticated"] = shareStore.validatePassword(info, password)
+		authenticated = shareStore.validatePassword(info, password)
+		result["authenticated"] = authenticated
 	} else {
 		result["authenticated"] = true
+	}
+
+	// Only expose additional details after authentication
+	if authenticated {
+		if info.ExpiresAt != "" {
+			result["expiresAt"] = info.ExpiresAt
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
