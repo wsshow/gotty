@@ -105,6 +105,9 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
     const [shareExpiry, setShareExpiry] = useState(0);
     const [shareResult, setShareResult] = useState<{ token: string; url: string } | null>(null);
     const [shareCopied, setShareCopied] = useState(false);
+    const [showShareManager, setShowShareManager] = useState(false);
+    const [shareList, setShareList] = useState<any[]>([]);
+    const [shareListLoading, setShareListLoading] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const folderInputRef = useRef<HTMLInputElement>(null);
@@ -991,7 +994,18 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
             setShareCopied(true);
             setTimeout(() => setShareCopied(false), 2000);
         } catch {
-            setError('复制失败');
+            try {
+                const input = document.createElement('input');
+                input.value = shareResult.url;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                setShareCopied(true);
+                setTimeout(() => setShareCopied(false), 2000);
+            } catch {
+                setError('复制失败');
+            }
         }
     };
 
@@ -1001,6 +1015,52 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
         setSharePassword('');
         setShareExpiry(0);
         setShareCopied(false);
+    };
+
+    const loadShareList = async () => {
+        setShareListLoading(true);
+        try {
+            const response = await fetch('./api/shares');
+            if (!response.ok) throw new Error('Failed to load shares');
+            const data = await response.json();
+            setShareList(data.shares || []);
+        } catch (err) {
+            console.error('Failed to load share list:', err);
+        } finally {
+            setShareListLoading(false);
+        }
+    };
+
+    const toggleShareManager = () => {
+        if (!showShareManager) {
+            loadShareList();
+        }
+        setShowShareManager(prev => !prev);
+    };
+
+    const deleteShare = async (token: string) => {
+        try {
+            const response = await fetch(`./api/share/delete?token=${encodeURIComponent(token)}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete share');
+            setShareList(prev => prev.filter(s => s.token !== token));
+        } catch (err) {
+            console.error('Failed to delete share:', err);
+        }
+    };
+
+    const copyShareUrl = async (token: string) => {
+        const url = `${window.location.origin}${window.location.pathname}s/${token}`;
+        try {
+            await navigator.clipboard.writeText(url);
+        } catch {
+            // fallback
+            const input = document.createElement('input');
+            input.value = url;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+        }
     };
 
     const handleDelete = (file: FileInfo) => {
@@ -1446,6 +1506,12 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                             </svg>
                             {loading ? '加载中...' : '刷新'}
                         </button>
+                        <button className={`share-manage-btn ${showShareManager ? 'active' : ''}`} onClick={toggleShareManager}>
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
+                            </svg>
+                            分享管理
+                        </button>
                     </div>
 
                     {batchUploadStats && (
@@ -1599,97 +1665,169 @@ export const FileManager = ({ onClose }: FileManagerProps) => {
                         </div>
                     )}
 
-                    <div className="files-list">
-                        {files.length === 0 ? (
-                            <div className="no-files">暂无文件</div>
-                        ) : (
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: '40px' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedFiles.size === files.length && files.length > 0}
-                                                onChange={(e) => {
-                                                    const target = e.target as HTMLInputElement;
-                                                    if (target.checked) {
-                                                        setSelectedFiles(new Set(files.map(f => f.name)));
-                                                    } else {
-                                                        setSelectedFiles(new Set());
-                                                    }
-                                                }}
-                                            />
-                                        </th>
-                                        <th>文件名</th>
-                                        <th>大小</th>
-                                        <th>修改时间</th>
-                                        <th>操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {files.map((file) => (
-                                        <tr key={file.name} className={file.isDir ? 'folder-row' : ''}>
-                                            <td onClick={(e) => e.stopPropagation()}>
+                    {showShareManager ? (
+                        <div className="share-manager-panel">
+                            <div className="share-manager-header">
+                                <h3>分享管理</h3>
+                                <button className="refresh-btn" onClick={loadShareList} disabled={shareListLoading}>
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            {shareListLoading ? (
+                                <div className="no-files">加载中...</div>
+                            ) : shareList.length === 0 ? (
+                                <div className="no-files">暂无分享</div>
+                            ) : (
+                                <table className="share-manager-table">
+                                    <thead>
+                                        <tr>
+                                            <th>文件/文件夹</th>
+                                            <th>类型</th>
+                                            <th>密码</th>
+                                            <th>过期时间</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {shareList.map(share => {
+                                            const name = share.path.split('/').pop() || share.path;
+                                            const isExpired = share.expired;
+                                            return (
+                                                <tr key={share.token} className={isExpired ? 'expired-row' : ''}>
+                                                    <td className="share-path-cell" title={share.path}>{name}</td>
+                                                    <td>{share.isDir ? '文件夹' : '文件'}</td>
+                                                    <td>{share.hasPassword ? '有' : '无'}</td>
+                                                    <td>{share.expiresAt ? new Date(share.expiresAt).toLocaleString('zh-CN') : '永久'}</td>
+                                                    <td>
+                                                        <span className={`share-status ${isExpired ? 'expired' : 'active'}`}>
+                                                            {isExpired ? '已过期' : '有效'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {!isExpired && (
+                                                            <button
+                                                                className="action-btn share-btn"
+                                                                onClick={() => copyShareUrl(share.token)}
+                                                                title="复制链接"
+                                                            >
+                                                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            className="action-btn delete-btn"
+                                                            onClick={() => deleteShare(share.token)}
+                                                            title="删除"
+                                                        >
+                                                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                                            </svg>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="files-list">
+                            {files.length === 0 ? (
+                                <div className="no-files">暂无文件</div>
+                            ) : (
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '40px' }}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedFiles.has(file.name)}
-                                                    onChange={() => toggleFileSelection(file.name)}
+                                                    checked={selectedFiles.size === files.length && files.length > 0}
+                                                    onChange={(e) => {
+                                                        const target = e.target as HTMLInputElement;
+                                                        if (target.checked) {
+                                                            setSelectedFiles(new Set(files.map(f => f.name)));
+                                                        } else {
+                                                            setSelectedFiles(new Set());
+                                                        }
+                                                    }}
                                                 />
-                                            </td>
-                                            <td className="filename" onClick={() => handlePreview(file)}>
-                                                <svg className="file-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                    {file.isDir ? (
-                                                        <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
-                                                    ) : (
-                                                        <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-                                                    )}
-                                                </svg>
-                                                {file.name}
-                                                {file.isDir && (
-                                                    <svg className="folder-arrow" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                        <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                                            </th>
+                                            <th>文件名</th>
+                                            <th>大小</th>
+                                            <th>修改时间</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {files.map((file) => (
+                                            <tr key={file.name} className={file.isDir ? 'folder-row' : ''}>
+                                                <td onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedFiles.has(file.name)}
+                                                        onChange={() => toggleFileSelection(file.name)}
+                                                    />
+                                                </td>
+                                                <td className="filename" onClick={() => handlePreview(file)}>
+                                                    <svg className="file-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        {file.isDir ? (
+                                                            <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                                                        ) : (
+                                                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                                                        )}
                                                     </svg>
-                                                )}
-                                            </td>
-                                            <td>{file.isDir ? '-' : formatSize(file.size!)}</td>
-                                            <td>{formatDate(file.time)}</td>
-                                            <td>
-                                                {!file.isDir && (
+                                                    {file.name}
+                                                    {file.isDir && (
+                                                        <svg className="folder-arrow" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+                                                        </svg>
+                                                    )}
+                                                </td>
+                                                <td>{file.isDir ? '-' : formatSize(file.size!)}</td>
+                                                <td>{formatDate(file.time)}</td>
+                                                <td>
+                                                    {!file.isDir && (
+                                                        <button
+                                                            className="action-btn download-btn"
+                                                            onClick={() => handleDownload(file)}
+                                                            title="下载"
+                                                        >
+                                                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        className="action-btn download-btn"
-                                                        onClick={() => handleDownload(file)}
-                                                        title="下载"
+                                                        className="action-btn share-btn"
+                                                        onClick={() => handleShare(file)}
+                                                        title="分享"
                                                     >
                                                         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                            <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                                                            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
                                                         </svg>
                                                     </button>
-                                                )}
-                                                <button
-                                                    className="action-btn share-btn"
-                                                    onClick={() => handleShare(file)}
-                                                    title="分享"
-                                                >
-                                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                        <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
-                                                    </svg>
-                                                </button>
-                                                <button
-                                                    className="action-btn delete-btn"
-                                                    onClick={() => handleDelete(file)}
-                                                    title="删除"
-                                                >
-                                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </div>
+                                                    <button
+                                                        className="action-btn delete-btn"
+                                                        onClick={() => handleDelete(file)}
+                                                        title="删除"
+                                                    >
+                                                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                                        </svg>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

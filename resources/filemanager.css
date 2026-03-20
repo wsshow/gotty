@@ -1958,6 +1958,112 @@ input[type="checkbox"] {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
+/* Share Manager */
+.share-manage-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.share-manage-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+}
+
+.share-manage-btn:hover {
+    background: #333;
+    border-color: #666;
+}
+
+.share-manage-btn.active {
+    background: #2a4a6b;
+    border-color: #5dade2;
+    color: #5dade2;
+}
+
+.share-manager-panel {
+    flex: 1;
+    overflow: auto;
+}
+
+.share-manager-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #333;
+    margin-bottom: 8px;
+}
+
+.share-manager-header h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #ccc;
+    font-weight: 500;
+}
+
+.share-manager-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.share-manager-table th {
+    text-align: left;
+    padding: 8px 6px;
+    color: #888;
+    font-weight: 500;
+    border-bottom: 1px solid #333;
+    white-space: nowrap;
+}
+
+.share-manager-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #2a2a3a;
+    color: #ccc;
+    white-space: nowrap;
+}
+
+.share-manager-table tr:hover td {
+    background: #2a2a3a;
+}
+
+.share-manager-table .expired-row td {
+    color: #666;
+}
+
+.share-path-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.share-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.share-status.active {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+}
+
+.share-status.expired {
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+}
+
 /* Share Dialog */
 .share-dialog {
     max-width: 500px;
